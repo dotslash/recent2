@@ -156,17 +156,27 @@ def log():
     conn.close()
 
 
-def query_builder(args):
+def query_builder(args, parser):
     query = SQL.TAIL_N_ROWS
     filters = []
     parameters = []
-    if (args.pattern != ''):
-        filters.append('command like ?')
-        parameters.append('%' + args.pattern + '%')
-    if (args.w != ''):
+    if args.re and args.sql:
+        print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
+        parser.print_help()
+        exit(1)
+    if args.pattern:
+        if args.re:
+            filters.append('command REGEXP ?')
+            parameters.append(args.pattern)
+        elif args.sql:
+            filters.append(args.pattern)
+        else:
+            filters.append('command like ?')
+            parameters.append('%' + args.pattern + '%')
+    if args.w:
         filters.append('pwd = ?')
         parameters.append(os.path.abspath(os.path.expanduser(args.w)))
-    if (args.d != ''):
+    if args.d:
         filters.append(parse_date(args.d))
         parameters.append(args.d)
     try:
@@ -178,20 +188,41 @@ def query_builder(args):
     return (query.replace('where', where), parameters)
 
 
+# Returns true if `item` matches `expr`. Used as sqlite UDF.
+def regexp(expr, item):
+    reg = re.compile(expr)
+    return reg.search(item) is not None
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('pattern', nargs='?', default='', help='optional pattern to search')
-    parser.add_argument('-n', metavar=('20'), help='max results to return', default=20)
-    parser.add_argument('-w', metavar=('/folder'), help='working directory', default='')
-    parser.add_argument('-d', metavar=('2016-10-01'), help='date in YYYY-MM-DD, YYYY-MM, or YYYY format', default='')
-    parser.add_argument('--hide_time', help='dont display time in command output', action='store_true')
+    parser.add_argument(
+        'pattern', nargs='?',
+        default='', help=('optional pattern to search'))
+    parser.add_argument('-n', metavar=('20'), help=('max results to return'), default=20)
+    parser.add_argument('-w', metavar=('/folder'), help=('working directory'), default='')
+    parser.add_argument(
+        '-d', metavar=('2016-10-01'),
+        help=('date in YYYY-MM-DD, YYYY-MM, or YYYY format'), default='')
+    parser.add_argument(
+        '--hide_time', '-ht',
+        help=('dont display time in command output'), action='store_true')
+    parser.add_argument('-re', help=('enable regex search pattern'), action='store_true')
+    parser.add_argument('-sql', help=('enable sqlite search pattern'), action='store_true')
+    parser.add_argument(
+        '--return_self',
+        help=('Return `recent` commands also in the output'), action='store_true')
     args = parser.parse_args()
     conn = create_connection()
+    # Install REGEXP sqlite UDF.
+    conn.create_function("REGEXP", 2, regexp)
     c = conn.cursor()
-    query, parameters = query_builder(args)
+    query, parameters = query_builder(args, parser)
     for row in c.execute(query, parameters):
         if not(row[0] and row[1]):
+            continue
+        # Return recent command in the output only if the user explicitly
+        # enables it.
+        if not args.return_self and row[1].startswith('recent '):
             continue
         if args.hide_time:
             print(row[1])
