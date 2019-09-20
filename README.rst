@@ -44,6 +44,15 @@ Search for a pattern as follows:
 
 ``recent git``
 
+``recent -re git.*commit``
+
+``recent -sql 'command like "%git%" and command not like "%commit%"'``
+
+By default ``recent`` commands are not displayed in the output. To see the ``recent`` commands pass
+the ``return_self`` argument as follows
+
+``recent git --return_self``
+
 For more information see the help:
 
 ``recent -h``
