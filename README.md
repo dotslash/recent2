@@ -36,6 +36,8 @@ And start a new shell.
 
 ## Usage
 
+See example usage at https://asciinema.org/a/271533
+
 Look at your current history using recent. Here are some examples on how to use recent.
 
 ```sh
