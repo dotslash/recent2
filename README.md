@@ -14,13 +14,19 @@ Recent does the following.
 2. Logs history immediately, rather than at the close of the session.
 3. Provides a command called `recent` for searching bash history.
 
+## NOTE about [trengrj/recent](https://github.com/trengrj/recent)
+`recent2` repo is a clone of [trengrj/recent](https://github.com/trengrj/recent). 
+I made a clone because I want to make some changes to the util and 
+[trengrj](https://github.com/trengrj) has not been very responsive. Most of the
+code is written by [trengrj](https://github.com/trengrj)
+
 ## Installation instructions
 
 You need will need sqlite installed.
 
 Install the recent pip package.
 
-`pip install recent`
+`pip install recent2`
 
 Add the following to your `.bashrc` or `.bash_profile`.
 
@@ -52,22 +58,10 @@ the `return_self` argument as follows.
 
 For more information run `recent -h`
 
-
-**Note**: currently recent doesn't integrate with bash commands such as Ctrl-R,
-but this is in the pipeline.
-
 You can directly query your history running `sqlite3 ~/.recent.db "select * from commands limit 10"`
 
 ## Dev installation instructions
-
-
 ```
-git clone https://github.com/dotslash/recent && cd recent
+git clone https://github.com/dotslash/recent2 && cd recent2
 pip install -e .
 ```
-
-## Security
-
-Please note, recent does not take into account enforcing logging
-for security purposes. For this functionality on linux, have a
-look at auditd http://people.redhat.com/sgrubb/audit/.
