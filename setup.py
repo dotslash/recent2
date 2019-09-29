@@ -2,56 +2,38 @@
 
 from setuptools import setup, find_packages
 from codecs import open
-from os import path
 import sys
 import fastentrypoints
 
-here = path.abspath(path.dirname(__file__))
+LONG_DESCRIPTION = open('README.md').read()
 
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
 
 setup(
-    name='recent',
-    version='0.1.3',
-
-    description='log bash history to an sqlite database',
-    long_description=long_description,
-
+    name='recent2',
+    version='0.1.6',
+    description='Logs bash history to an sqlite database',
+    long_description=LONG_DESCRIPTION,
+    long_description_content_type='text/markdown',
     # The project's main homepage.
-    url='https://github.com/trengrj/recent',
-
-    # Author details
-    author='John Trengrove',
-    author_email='john@retrofilter.com',
-
+    url='https://github.com/dotslash/recent',
     license='MIT',
-
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Environment :: Console',
         'Topic :: System :: Logging',
+        'Topic :: System :: Shells',
+        'Topic :: Utilities',
         'License :: OSI Approved :: MIT License',
-
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3 :: Only'
     ],
-
-    keywords='logging bash history database',
-
-    py_modules=["recent"],
-
+    keywords='logging bash history database sqlite',
+    py_modules=["recent2"],
     entry_points={
         'console_scripts': [
-            'log-recent=recent:log',
-            'recent=recent:main',
+            'log-recent=recent2:log',
+            'recent=recent2:main',
         ],
     },
 )

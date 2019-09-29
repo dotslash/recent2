@@ -62,7 +62,7 @@ You can directly query your history running `sqlite3 ~/.recent.db "select * from
 
 
 ```
-git clone https://github.com/trengrj/recent && cd recent
+git clone https://github.com/dotslash/recent && cd recent
 pip install -e .
 ```
 
