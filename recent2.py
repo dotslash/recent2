@@ -160,6 +160,9 @@ def query_builder(args, parser):
     query = SQL.TAIL_N_ROWS
     filters = []
     parameters = []
+    if not args.return_self:
+        # Dont return recent commands unless user asks for it.
+        filters.append('command not like "recent%"')
     if args.re and args.sql:
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
         parser.print_help()
@@ -220,12 +223,11 @@ def main():
     for row in c.execute(query, parameters):
         if not(row[0] and row[1]):
             continue
-        # Return recent command in the output only if the user explicitly
-        # enables it.
-        if not args.return_self and row[1].startswith('recent '):
-            continue
         if args.hide_time:
             print(row[1])
         if not args.hide_time:
             print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
     conn.close()
+
+if __name__ == '__main__':
+    main()
