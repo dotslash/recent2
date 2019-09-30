@@ -15,10 +15,14 @@ Recent does the following.
 3. Provides a command called `recent` for searching bash history.
 
 ## NOTE about [trengrj/recent](https://github.com/trengrj/recent)
-`recent2` repo is a clone of [trengrj/recent](https://github.com/trengrj/recent). 
-I made a clone because I want to make some changes to the util and 
-[trengrj](https://github.com/trengrj) has not been very responsive. Most of the
-code is written by [trengrj](https://github.com/trengrj)
+`recent2` is a clone of [trengrj/recent](https://github.com/trengrj/recent). I
+used [trengrj](https://github.com/trengrj)'s util for about a month and I really
+liked it. However I saw some short comings in the tool. I made a clone because
+trengrj has not been very responsive. 
+
+Most of the code is written by [trengrj](https://github.com/trengrj). I only added
+a few incremental patches; but I intend to actively maintain this as I see more
+interesting use cases.
 
 ## Installation instructions
 
