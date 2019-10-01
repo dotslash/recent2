@@ -15,7 +15,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
     # The project's main homepage.
-    url='https://github.com/dotslash/recent',
+    url='https://github.com/dotslash/recent2',
     license='MIT',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
