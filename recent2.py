@@ -8,6 +8,7 @@ import socket
 
 SCHEMA_VERSION = 1
 
+
 class Term:
 
     HEADER = '\033[95m'
@@ -57,8 +58,13 @@ class Session:
         # STY for GNU screen
         # SHLVL handles nested shells
         seed = "{}-{}-{}-{}-{}-{}-{}".format(
-            os.getenv('TERM_SESSION_ID', ''), os.getenv('WINDOWID', ''), os.getenv('SHLVL', ''),
-            os.getenv('TMUX', ''), os.getenv('TMUX_PANE',''), os.getenv('STY',''), pid)
+            os.getenv('TERM_SESSION_ID', ''),
+            os.getenv('WINDOWID', ''),
+            os.getenv('SHLVL', ''),
+            os.getenv('TMUX', ''),
+            os.getenv('TMUX_PANE', ''),
+            os.getenv('STY', ''),
+            pid)
         self.id = hashlib.md5(seed.encode('utf-8')).hexdigest()
 
     def update(self, conn):
@@ -67,7 +73,8 @@ class Session:
             term = os.getenv('TERM', '')
             hostname = socket.gethostname()
             user = os.getenv('USER', '')
-            c.execute(SQL.INSERT_SESSION, [term, hostname, user, self.sequence, self.id])
+            c.execute(SQL.INSERT_SESSION,
+                      [term, hostname, user, self.sequence, self.id])
             self.empty = True
         except sqlite3.IntegrityError:
             # Carriage returns need to be ignored
@@ -83,7 +90,9 @@ def migrate(version, conn):
     c = conn.cursor()
     if version == 0:
         if c.execute(SQL.CHECK_COMMANDS_TABLE).fetchone()[0] != 0:
-            print(Term.WARNING + 'recent: migrating schema to version {}'.format(SCHEMA_VERSION) + Term.ENDC)
+            print(Term.WARNING +
+                  'recent: migrating schema to version {}'.format(SCHEMA_VERSION) +
+                  Term.ENDC)
             c.execute(SQL.MIGRATE_0_1)
         else:
             print(Term.WARNING + 'recent: building schema' + Term.ENDC)
@@ -96,11 +105,13 @@ def migrate(version, conn):
 
 
 def parse_history(history):
-    match = re.search(r'^\s+(\d+)\s+(.*)$', history, re.MULTILINE and re.DOTALL)
+    match = re.search(r'^\s+(\d+)\s+(.*)$', history,
+                      re.MULTILINE and re.DOTALL)
     if match:
         return (match.group(1), match.group(2))
     else:
         return (None, None)
+
 
 def parse_date(format):
     if re.match(r'^\d{4}$', format):
@@ -119,6 +130,7 @@ def create_connection():
     build_schema(conn)
     return conn
 
+
 def build_schema(conn):
     try:
         c = conn.cursor()
@@ -128,10 +140,12 @@ def build_schema(conn):
     except (sqlite3.OperationalError, TypeError) as e:
         migrate(0, conn)
 
+
 def log():
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--return_value', help='set to $?', default=0)
-    parser.add_argument('-c', '--command', help='set to $(HISTTIMEFORMAT= history 1)', default='')
+    parser.add_argument('-c', '--command',
+                        help='set to $(HISTTIMEFORMAT= history 1)', default='')
     parser.add_argument('-p', '--pid', help='set to $$', default=0)
     args = parser.parse_args()
 
@@ -140,7 +154,9 @@ def log():
     pwd = os.getenv('PWD', '')
 
     if sequence == None or command == None:
-        print(Term.WARNING + 'recent: cannot parse command output, please check your bash trigger looks like this:'  + Term.ENDC)
+        print(Term.WARNING +
+              'recent: cannot parse command output, please check your bash trigger looks like this:' +
+              Term.ENDC)
         print("""export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
         exit(1)
 
@@ -150,7 +166,8 @@ def log():
 
     if not session.empty:
         c = conn.cursor()
-        c.execute(SQL.INSERT_ROW, [command, pid, return_value, pwd, session.id])
+        c.execute(SQL.INSERT_ROW, [command, pid,
+                                   return_value, pwd, session.id])
 
     conn.commit()
     conn.close()
@@ -161,9 +178,12 @@ def query_builder(args, parser):
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
         parser.print_help()
         exit(1)
-    num_status_filter = sum(1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
+    num_status_filter = sum(
+        1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
     if num_status_filter > 1:
-        print(Term.FAIL + 'Only one of --successes_only, --failures_only and --status_num has to be set' + Term.ENDC)
+        print(Term.FAIL +
+              'Only one of --successes_only, --failures_only and --status_num has to be set' +
+              Term.ENDC)
         parser.print_help()
         exit(1)
     query = SQL.TAIL_N_ROWS
@@ -208,36 +228,46 @@ def regexp(expr, item):
     reg = re.compile(expr)
     return reg.search(item) is not None
 
+
 def make_arg_parser_for_recent():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'pattern', nargs='?',
         default='', help=('optional pattern to search'))
-    parser.add_argument('-n', metavar=('20'), help=('max results to return'), default=20)
+    parser.add_argument('-n', metavar=('20'),
+                        help=('max results to return'), default=20)
 
     # Filters for command success/failure.
     parser.add_argument('--status_num', '-stn', metavar=('0'),
-        help=('int exit status of the commands to return. -1 => return all.'), default=-1)
+                        help=('int exit status of the commands to return. -1 => return all.'),
+                        default=-1)
     parser.add_argument('--successes_only', '-so',
-        help=('only return commands that exited with success'), action='store_true')
+                        help=('only return commands that exited with success'),
+                        action='store_true')
     parser.add_argument('--failures_only', '-fo',
-        help=('only return commands that exited with failure'), action='store_true')
+                        help=('only return commands that exited with failure'),
+                        action='store_true')
     # Other filters.
-    parser.add_argument('-w', metavar=('/folder'), help=('working directory'), default='')
+    parser.add_argument('-w', metavar=('/folder'),
+                        help=('working directory'), default='')
     parser.add_argument(
         '-d', metavar=('2016-10-01'),
         help=('date in YYYY-MM-DD, YYYY-MM, or YYYY format'), default='')
     parser.add_argument(
         '--return_self',
-        help=('Return `recent` commands also in the output'), action='store_true')
+        help=('Return `recent` commands also in the output'),
+        action='store_true')
     # Hide time. This makes copy-pasting simpler.
     parser.add_argument(
         '--hide_time', '-ht',
         help=('dont display time in command output'), action='store_true')
     # Query type - regex/sql.
-    parser.add_argument('-re', help=('enable regex search pattern'), action='store_true')
-    parser.add_argument('-sql', help=('enable sqlite search pattern'), action='store_true')
+    parser.add_argument(
+        '-re', help=('enable regex search pattern'), action='store_true')
+    parser.add_argument(
+        '-sql', help=('enable sqlite search pattern'), action='store_true')
     return parser
+
 
 def main():
     parser = make_arg_parser_for_recent()
@@ -255,6 +285,7 @@ def main():
         if not args.hide_time:
             print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
     conn.close()
+
 
 if __name__ == '__main__':
     main()
