@@ -10,7 +10,7 @@ LONG_DESCRIPTION = open('README.md').read()
 
 setup(
     name='recent2',
-    version='0.1.6',
+    version='0.1.7',
     description='Logs bash history to an sqlite database',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
