@@ -85,7 +85,8 @@ class Session:
 
 def migrate(version, conn):
     if version > SCHEMA_VERSION:
-        exit(Term.FAIL + 'recent: your command history database does not match recent, please update' + Term.ENDC)
+        exit(Term.FAIL + ('recent: your command history database does not '
+                          'match recent, please update') + Term.ENDC)
 
     c = conn.cursor()
     if version == 0:
@@ -137,7 +138,7 @@ def build_schema(conn):
         current = c.execute(SQL.GET_SCHEMA_VERSION).fetchone()[0]
         if current != SCHEMA_VERSION:
             migrate(current, conn)
-    except (sqlite3.OperationalError, TypeError) as e:
+    except (sqlite3.OperationalError, TypeError):
         migrate(0, conn)
 
 
@@ -153,11 +154,13 @@ def log():
     pid, return_value = args.pid, args.return_value
     pwd = os.getenv('PWD', '')
 
-    if sequence == None or command == None:
+    if not sequence or not command:
         print(Term.WARNING +
-              'recent: cannot parse command output, please check your bash trigger looks like this:' +
+              ('recent: cannot parse command output, please check your bash '
+               'trigger looks like this:') +
               Term.ENDC)
-        print("""export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
+        print("""export PROMPT_COMMAND="""
+              """'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
         exit(1)
 
     conn = create_connection()
@@ -182,7 +185,8 @@ def query_builder(args, parser):
         1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
     if num_status_filter > 1:
         print(Term.FAIL +
-              'Only one of --successes_only, --failures_only and --status_num has to be set' +
+              ('Only one of --successes_only, --failures_only and '
+               '--status_num has to be set') +
               Term.ENDC)
         parser.print_help()
         exit(1)
