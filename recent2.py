@@ -157,16 +157,28 @@ def log():
 
 
 def query_builder(args, parser):
-    query = SQL.TAIL_N_ROWS
-    filters = []
-    parameters = []
-    if not args.return_self:
-        # Dont return recent commands unless user asks for it.
-        filters.append('command not like "recent%"')
     if args.re and args.sql:
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
         parser.print_help()
         exit(1)
+    num_status_filter = sum(1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
+    if num_status_filter > 1:
+        print(Term.FAIL + 'Only one of --successes_only, --failures_only and --status_num has to be set' + Term.ENDC)
+        parser.print_help()
+        exit(1)
+    query = SQL.TAIL_N_ROWS
+    filters = []
+    parameters = []
+    if args.successes_only:
+        filters.append('return_val = 0')
+    if args.failures_only:
+        filters.append('return_val <> 0')
+    if args.status_num != -1:
+        filters.append('return_val == ?')
+        parameters.append(args.status_num)
+    if not args.return_self:
+        # Dont return recent commands unless user asks for it.
+        filters.append('command not like "recent%"')
     if args.pattern:
         if args.re:
             filters.append('command REGEXP ?')
@@ -196,24 +208,39 @@ def regexp(expr, item):
     reg = re.compile(expr)
     return reg.search(item) is not None
 
-def main():
+def make_arg_parser_for_recent():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'pattern', nargs='?',
         default='', help=('optional pattern to search'))
     parser.add_argument('-n', metavar=('20'), help=('max results to return'), default=20)
+
+    # Filters for command success/failure.
+    parser.add_argument('--status_num', '-stn', metavar=('0'),
+        help=('int exit status of the commands to return. -1 => return all.'), default=-1)
+    parser.add_argument('--successes_only', '-so',
+        help=('only return commands that exited with success'), action='store_true')
+    parser.add_argument('--failures_only', '-fo',
+        help=('only return commands that exited with failure'), action='store_true')
+    # Other filters.
     parser.add_argument('-w', metavar=('/folder'), help=('working directory'), default='')
     parser.add_argument(
         '-d', metavar=('2016-10-01'),
         help=('date in YYYY-MM-DD, YYYY-MM, or YYYY format'), default='')
     parser.add_argument(
-        '--hide_time', '-ht',
-        help=('dont display time in command output'), action='store_true')
-    parser.add_argument('-re', help=('enable regex search pattern'), action='store_true')
-    parser.add_argument('-sql', help=('enable sqlite search pattern'), action='store_true')
-    parser.add_argument(
         '--return_self',
         help=('Return `recent` commands also in the output'), action='store_true')
+    # Hide time. This makes copy-pasting simpler.
+    parser.add_argument(
+        '--hide_time', '-ht',
+        help=('dont display time in command output'), action='store_true')
+    # Query type - regex/sql.
+    parser.add_argument('-re', help=('enable regex search pattern'), action='store_true')
+    parser.add_argument('-sql', help=('enable sqlite search pattern'), action='store_true')
+    return parser
+
+def main():
+    parser = make_arg_parser_for_recent()
     args = parser.parse_args()
     conn = create_connection()
     # Install REGEXP sqlite UDF.
