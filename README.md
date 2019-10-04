@@ -44,27 +44,46 @@ See example usage at https://asciinema.org/a/271533
 
 Look at your current history using recent. Here are some examples on how to use recent.
 
+
+### Basic examples
+
 ```sh
 # Help
 recent -h
 # Look for all git commands
 recent git
-# Look for git commit commands.
-# Query via regexp mode.
+# Look for git commit commands. Query via regexp mode.
 recent -re git.*commit
-# Look for git commands that are not commits.
-# Query via sql mode.
-recent -sql 'command like "%git%" and command not like "%commit%"'
 ```
 
-By default `recent` commands are not displayed in the output. To see the `recent` commands pass
-the `return_self` argument as follows.
+### Less basic usage
 
-`recent git --return_self`
+- Filter commands by exit status
+  1. `recent git --successes_only` or `recent git --so`
+  2. `recent git --failures_only` or `recent git --fo`
+  3. `recent git --status_num 1` or `recent git --stn 1` returns only the git commands tht have an exit status 1
+- `recent git --return_self`. By default `recent` commands are not displayed in the output. Pass the `return_self` to change that.
+- `recent git -w ~/code`. This returns only the commands that were executed with `~/code` as current working directory.
+- Filter the commands by execution time by doing `recent git -d 2019` or `recent git -d 2019-10` or `recent git -d 2019-10-04`
+- By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` hide the command timestamp. This is good for copy-pasting commands.
 
-For more information run `recent -h`
+### Usage via sqlite
 
-You can directly query your history running `sqlite3 ~/.recent.db "select * from commands limit 10"`
+It is possible directly interact with sqlite if all the above options have failed you. See the table schema below.
+
+```sql
+CREATE TABLE commands(
+  command_dt timestamp,
+  command text,
+  pid int,
+  return_val int,
+  pwd text,
+  session text);
+CREATE INDEX command_dt_ind on commands (command_dt);
+```
+
+- option1: `recent -sql 'command like "%git%" and command not like "%commit%"'`
+- option2: you can directly play around with sqlite `sqlite3 ~/.recent.db "select * from commands limit 10"`
 
 ## Dev installation instructions
 ```
