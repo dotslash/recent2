@@ -234,7 +234,10 @@ def regexp(expr, item):
 
 
 def make_arg_parser_for_recent():
-    parser = argparse.ArgumentParser()
+    description = ('recent is a convinient way to query bash history. '
+                   'Visit {} for more examples or to ask questions or to report issues'
+                   ).format(Term.UNDERLINE + 'https://github.com/dotslash/recent2' + Term.ENDC)
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         'pattern', nargs='?',
         default='', help=('optional pattern to search'))
