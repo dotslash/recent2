@@ -15,10 +15,11 @@ Recent does the following.
 3. Provides a command called `recent` for searching bash history.
 
 ## NOTE about [trengrj/recent](https://github.com/trengrj/recent)
+
 `recent2` is a clone of [trengrj/recent](https://github.com/trengrj/recent). I
 used [trengrj](https://github.com/trengrj)'s util for about a month and I really
 liked it. However I saw some short comings in the tool. I made a clone because
-trengrj has not been very responsive. 
+trengrj has not been very responsive.
 
 Most of the code is written by [trengrj](https://github.com/trengrj). I only added
 a few incremental patches; but I intend to actively maintain this as I see more
@@ -44,7 +45,6 @@ See example usage at https://asciinema.org/a/271533
 
 Look at your current history using recent. Here are some examples on how to use recent.
 
-
 ### Basic examples
 
 ```sh
@@ -59,13 +59,13 @@ recent -re git.*commit
 ### Less basic usage
 
 - Filter commands by exit status
-  1. `recent git --successes_only` or `recent git --so`
-  2. `recent git --failures_only` or `recent git --fo`
-  3. `recent git --status_num 1` or `recent git --stn 1` returns only the git commands tht have an exit status 1
+  1. `recent git --successes_only` or `recent git -so`
+  2. `recent git --failures_only` or `recent git -fo`
+  3. `recent git --status_num 1` or `recent git -stn 1` returns only the git commands that have exit status 1.
 - `recent git --return_self`. By default `recent` commands are not displayed in the output. Pass the `return_self` to change that.
 - `recent git -w ~/code`. This returns only the commands that were executed with `~/code` as current working directory.
-- Filter the commands by execution time by doing `recent git -d 2019` or `recent git -d 2019-10` or `recent git -d 2019-10-04`
-- By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` hide the command timestamp. This is good for copy-pasting commands.
+- Filter the commands by execution date by doing `recent git -d 2019` or `recent git -d 2019-10` or `recent git -d 2019-10-04`
+- By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` hide the command timestamp. This is useful when copy-pasting commands from output.
 
 ### Usage via sqlite
 
@@ -83,10 +83,11 @@ CREATE INDEX command_dt_ind on commands (command_dt);
 ```
 
 - option1: `recent -sql 'command like "%git%" and command not like "%commit%"'`
-- option2: you can directly play around with sqlite `sqlite3 ~/.recent.db "select * from commands limit 10"`
+- option2: You can directly play around with sqlite `sqlite3 ~/.recent.db "select * from commands limit 10"`
 
 ## Dev installation instructions
-```
+
+```sh
 git clone https://github.com/dotslash/recent2 && cd recent2
 pip install -e .
 ```
