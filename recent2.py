@@ -273,7 +273,24 @@ def make_arg_parser_for_recent():
     return parser
 
 
+def check_prompt():
+    import os
+    expected_prompt = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
+    actual_prompt = os.environ.get('PROMPT_COMMAND', '')
+    export_promot_cmd = \
+        '''export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$' '''
+    if expected_prompt not in actual_prompt:
+        print(Term.BOLD +
+              "PROMPT_COMMAND env variable is not set. " +
+              "Add the following line to .bashrc or .bash_profile" +
+              Term.ENDC)
+
+        print(Term.UNDERLINE + export_promot_cmd + Term.ENDC)
+        exit(1)
+
+
 def main():
+    check_prompt()  # Fail the command if PROMPT_COMMAND is not set
     parser = make_arg_parser_for_recent()
     args = parser.parse_args()
     conn = create_connection()
