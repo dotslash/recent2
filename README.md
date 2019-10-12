@@ -43,13 +43,44 @@ And start a new shell.
 
 See example usage at https://asciinema.org/a/271533
 
+### Help Text
+
+```sh
+> recent -h
+usage: recent [-h] [-n 20] [--status_num 0] [--successes_only]
+              [--failures_only] [-w /folder] [-d 2016-10-01] [--return_self]
+              [--hide_time] [-re] [-sql]
+              [pattern]
+
+recent is a convinient way to query bash history. Visit
+https://github.com/dotslash/recent2 for more examples or to ask
+questions or to report issues
+
+positional arguments:
+  pattern               optional pattern to search
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -n 20                 max results to return
+  --status_num 0, -stn 0
+                        int exit status of the commands to return. -1 =>
+                        return all.
+  --successes_only, -so
+                        only return commands that exited with success
+  --failures_only, -fo  only return commands that exited with failure
+  -w /folder            working directory
+  -d 2016-10-01         date in YYYY-MM-DD, YYYY-MM, or YYYY format
+  --return_self         Return `recent` commands also in the output
+  --hide_time, -ht      dont display time in command output
+  -re                   enable regex search pattern
+  -sql                  enable sqlite search pattern
+```
+
 Look at your current history using recent. Here are some examples on how to use recent.
 
 ### Basic examples
 
 ```sh
-# Help
-recent -h
 # Look for all git commands
 recent git
 # Look for git commit commands. Query via regexp mode.
@@ -65,7 +96,7 @@ recent -re git.*commit
 - `recent git --return_self`. By default `recent` commands are not displayed in the output. Pass the `return_self` to change that.
 - `recent git -w ~/code`. This returns only the commands that were executed with `~/code` as current working directory.
 - Filter the commands by execution date by doing `recent git -d 2019` or `recent git -d 2019-10` or `recent git -d 2019-10-04`
-- By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` hide the command timestamp. This is useful when copy-pasting commands from output.
+- By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` to hide the command timestamp. This is useful when copy-pasting commands from output.
 
 ### Usage via sqlite
 
