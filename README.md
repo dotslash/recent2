@@ -74,6 +74,8 @@ optional arguments:
   --hide_time, -ht      dont display time in command output
   -re                   enable regex search pattern
   -sql                  enable sqlite search pattern
+
+To import bash history into recent db run recent-import-bash-history
 ```
 
 Look at your current history using recent. Here are some examples on how to use recent.
