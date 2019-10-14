@@ -183,6 +183,8 @@ def log():
 # Entry point to recent-import-bash-history command.
 def import_bash_history():
     import sys
+    # TODO(dotslash): Avoid double importing bash history. Record this operation by
+    #                 `touch ~/.recent2_imported_bash_history`
     if len(sys.argv) != 1:
         # Help and stuff (Quick and dirty)
         exit_status = 0
@@ -308,7 +310,9 @@ def make_arg_parser_for_recent():
     description = ('recent is a convinient way to query bash history. '
                    'Visit {} for more examples or to ask questions or to report issues'
                    ).format(Term.UNDERLINE + 'https://github.com/dotslash/recent2' + Term.ENDC)
-    parser = argparse.ArgumentParser(description=description)
+    epilog = 'To import bash history into recent db run {}'.format(
+        Term.UNDERLINE + 'recent-import-bash-history' + Term.ENDC)
+    parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument(
         'pattern', nargs='?',
         default='', help=('optional pattern to search'))
