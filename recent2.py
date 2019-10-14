@@ -23,8 +23,10 @@ class Term:
 
 class SQL:
 
-    INSERT_ROW = """insert into commands (command_dt, command, pid, return_val, pwd, session)
-        values (datetime('now','localtime'), ?, ?, ?, ?, ?)"""
+    INSERT_ROW_CUSTOM_BASE = """insert into commands (command_dt, command, pid, return_val, pwd, session)
+        values ({}, ?, ?, ?, ?, ?)"""
+    INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')")
+    INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')")
     INSERT_SESSION = """insert into sessions (created_dt, updated_dt,
         term, hostname, user, sequence, session)
         values (datetime('now','localtime'), datetime('now','localtime'), ?, ?, ?, ?, ?)"""
@@ -142,6 +144,7 @@ def build_schema(conn):
         migrate(0, conn)
 
 
+# Entry point to recent-log command.
 def log():
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--return_value', help='set to $?', default=0)
@@ -172,6 +175,76 @@ def log():
         c.execute(SQL.INSERT_ROW, [command, pid,
                                    return_value, pwd, session.id])
 
+    conn.commit()
+    conn.close()
+
+
+# Imports bash_history into RECENT_DB
+# Entry point to recent-import-bash-history command.
+def import_bash_history():
+    import sys
+    # TODO(dotslash): Avoid double importing bash history. Record this operation by
+    #                 `touch ~/.recent2_imported_bash_history`
+    if len(sys.argv) != 1:
+        # Help and stuff (Quick and dirty)
+        exit_status = 0
+        if set(sys.argv[1:]) not in ({'-h'}, {'--help'}):
+            print(sys.argv[0] + ": unknown args passed")
+            exit_status = 1
+        print(sys.argv[0] + ": Imports bash history into ~/.recent.db")
+        exit(exit_status)
+    # Construct history from bash_history.
+    # Example bash_history. The history has 3 entries. First entry has no timestamp attached to it.
+    # The next 2 entries have timestamp attached to them. The last entry has some unknown comment
+    # which we will ignore.
+    """
+    ls /
+    #1571012545
+    echo foo
+    #1571012560
+    #useless comment that should be ignored.
+    cat bar
+    """
+    history = []
+    # Phase 1 starts: After this phase history will be like this
+    # [(-1, "ls /"), # This entry has no timestamp.
+    #  (1571012545, "echo foo"),
+    #  (1571012560, "cat bar")]
+    last_ts = -1
+    for line in open(os.path.expanduser("~/.bash_history")):
+        if line[0] == '#':
+            try:
+                last_ts = int(line[1:].strip())
+            except Exception:
+                # Ignore the exception.
+                pass
+            continue
+        history.append([last_ts, line.strip()])
+
+    # Phase 2 starts: After this phase history will be like this
+    # [(1571012545, "ls /"), # Timestamp for this comes from its next entry
+    #  (1571012545, "echo foo"),
+    #  (1571012560, "cat bar")]
+    last_ts = -1
+    for i in range(len(history) - 1, -1, -1):
+        if history[i][0] == -1 and last_ts != -1:
+            history[i][0] = last_ts
+        elif history[i][0] != -1 and last_ts == -1:
+            last_ts = history[i][0]
+    # Add the history entries into recent's DB.
+    conn = create_connection()
+    import random
+    # Create a session with a random -ve pid and random -ve sequence id.
+    pid = -random.randint(1, 10000000)
+    session = Session(pid=pid, sequence=-random.randint(1, 10000000))
+    session.update(conn)
+    for cmd_ts, cmd in history:
+        c = conn.cursor()
+        c.execute(SQL.INSERT_ROW_CUSTOM_TS, [
+            cmd_ts, cmd, pid,
+            # exit status=-1, working directory=/unknown
+            -1, "/unknown",
+            session.id])
     conn.commit()
     conn.close()
 
@@ -237,7 +310,9 @@ def make_arg_parser_for_recent():
     description = ('recent is a convinient way to query bash history. '
                    'Visit {} for more examples or to ask questions or to report issues'
                    ).format(Term.UNDERLINE + 'https://github.com/dotslash/recent2' + Term.ENDC)
-    parser = argparse.ArgumentParser(description=description)
+    epilog = 'To import bash history into recent db run {}'.format(
+        Term.UNDERLINE + 'recent-import-bash-history' + Term.ENDC)
+    parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument(
         'pattern', nargs='?',
         default='', help=('optional pattern to search'))
@@ -292,6 +367,7 @@ def check_prompt():
         exit(1)
 
 
+# Entry point to recent command.
 def main():
     check_prompt()  # Fail the command if PROMPT_COMMAND is not set
     parser = make_arg_parser_for_recent()
