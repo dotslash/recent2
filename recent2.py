@@ -232,7 +232,7 @@ def import_bash_history():
     # Add the history entries into recent's DB.
     conn = create_connection()
     import random
-    # Create a session with a random -ve pid and randome -ve sequence id.
+    # Create a session with a random -ve pid and random -ve sequence id.
     pid = -random.randint(1, 10000000)
     session = Session(pid=pid, sequence=-random.randint(1, 10000000))
     session.update(conn)
