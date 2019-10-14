@@ -10,7 +10,7 @@ LONG_DESCRIPTION = open('README.md').read()
 
 setup(
     name='recent2',
-    version='0.2.1',
+    version='0.3',
     description='Logs bash history to an sqlite database',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
@@ -33,6 +33,7 @@ setup(
     entry_points={
         'console_scripts': [
             'log-recent=recent2:log',
+            'recent-import-bash-history=recent2:import_bash_history',
             'recent=recent2:main',
         ],
     },
