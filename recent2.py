@@ -388,7 +388,6 @@ def main():
 
 
 if __name__ == '__main__':
-    import_bash_history()
     print("=================")
     print("Executing recent from __main__.")
     print("This means recent2 is being run via `python recent2.py`")
