@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from setuptools import setup
 from codecs import open
-import sys
-import fastentrypoints
+import fastentrypoints  # noqa: F401
 
 LONG_DESCRIPTION = open('README.md').read()
 
