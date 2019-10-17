@@ -181,18 +181,26 @@ def log():
 
 # Imports bash_history into RECENT_DB
 # Entry point to recent-import-bash-history command.
+def import_bash_history_entry_point():
+    description = ('recent-import-bash-history imports bash_history into ~/.recent.db. '
+                   'Run `recent -h` for info about recent command.')
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('-f',
+                        help='Force import bash history ignoring previous imports',
+                        action='store_true')
+    args = parser.parse_args()
+    import_file = os.path.expanduser("~/.recent_imported_bash_history")
+    if not args.f and os.path.exists(import_file):
+        print(Term.FAIL +
+              'recent-import-bash-history failed: Bash history already imported into ~/.recent.db')
+        print('Run the command with -f option if you are absolutely sure.' + Term.ENDC)
+        parser.print_help()
+        exit(1)
+    import_bash_history()
+    open(import_file, 'a').close()
+
+
 def import_bash_history():
-    import sys
-    # TODO(dotslash): Avoid double importing bash history. Record this operation by
-    #                 `touch ~/.recent2_imported_bash_history`
-    if len(sys.argv) != 1:
-        # Help and stuff (Quick and dirty)
-        exit_status = 0
-        if set(sys.argv[1:]) not in ({'-h'}, {'--help'}):
-            print(sys.argv[0] + ": unknown args passed")
-            exit_status = 1
-        print(sys.argv[0] + ": Imports bash history into ~/.recent.db")
-        exit(exit_status)
     # Construct history from bash_history.
     # Example bash_history. The history has 3 entries. First entry has no timestamp attached to it.
     # The next 2 entries have timestamp attached to them. The last entry has some unknown comment

@@ -32,7 +32,7 @@ setup(
     entry_points={
         'console_scripts': [
             'log-recent=recent2:log',
-            'recent-import-bash-history=recent2:import_bash_history',
+            'recent-import-bash-history=recent2:import_bash_history_entry_point',
             'recent=recent2:main',
         ],
     },
