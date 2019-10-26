@@ -23,7 +23,8 @@ class Term:
 
 class SQL:
 
-    INSERT_ROW_CUSTOM_BASE = """insert into commands (command_dt, command, pid, return_val, pwd, session)
+    INSERT_ROW_CUSTOM_BASE = """insert into commands
+        (command_dt, command, pid, return_val, pwd, session)
         values ({}, ?, ?, ?, ?, ?)"""
     INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')")
     INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')")
@@ -53,7 +54,7 @@ class Session:
     def __init__(self, pid, sequence):
         self.sequence = sequence
         self.empty = False
-        # This combinaton of ENV vars *should* provide a unique session
+        # This combination of ENV vars *should* provide a unique session
         # TERM_SESSION_ID for OS X Terminal
         # XTERM for xterm
         # TMUX, TMUX_PANE for tmux
@@ -111,17 +112,17 @@ def parse_history(history):
     match = re.search(r'^\s+(\d+)\s+(.*)$', history,
                       re.MULTILINE and re.DOTALL)
     if match:
-        return (match.group(1), match.group(2))
+        return match.group(1), match.group(2)
     else:
-        return (None, None)
+        return None, None
 
 
-def parse_date(format):
-    if re.match(r'^\d{4}$', format):
+def parse_date(date_format):
+    if re.match(r'^\d{4}$', date_format):
         return 'strftime(\'%Y\', command_dt) = ?'
-    if re.match(r'^\d{4}-\d{2}$', format):
+    if re.match(r'^\d{4}-\d{2}$', date_format):
         return 'strftime(\'%Y-%m\', command_dt) = ?'
-    if re.match(r'^\d{4}-\d{2}-\d{2}$', format):
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', date_format):
         return 'date(command_dt) = ?'
     else:
         return 'command_dt = ?'
@@ -305,7 +306,7 @@ def query_builder(args, parser):
     except:
         exit(Term.FAIL + '-n must be a integer' + Term.ENDC)
     where = 'where ' + ' and '.join(filters) if len(filters) > 0 else ''
-    return (query.replace('where', where), parameters)
+    return query.replace('where', where), parameters
 
 
 # Returns true if `item` matches `expr`. Used as sqlite UDF.
@@ -315,7 +316,7 @@ def regexp(expr, item):
 
 
 def make_arg_parser_for_recent():
-    description = ('recent is a convinient way to query bash history. '
+    description = ('recent is a convenient way to query bash history. '
                    'Visit {} for more examples or to ask questions or to report issues'
                    ).format(Term.UNDERLINE + 'https://github.com/dotslash/recent2' + Term.ENDC)
     epilog = 'To import bash history into recent db run {}'.format(
@@ -323,39 +324,39 @@ def make_arg_parser_for_recent():
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument(
         'pattern', nargs='?',
-        default='', help=('optional pattern to search'))
-    parser.add_argument('-n', metavar=('20'),
-                        help=('max results to return'), default=20)
+        default='', help='optional pattern to search')
+    parser.add_argument('-n', metavar='20',
+                        help='max results to return', default=20)
 
     # Filters for command success/failure.
-    parser.add_argument('--status_num', '-stn', metavar=('0'),
-                        help=('int exit status of the commands to return. -1 => return all.'),
+    parser.add_argument('--status_num', '-stn', metavar='0',
+                        help='int exit status of the commands to return. -1 => return all.',
                         default=-1)
     parser.add_argument('--successes_only', '-so',
-                        help=('only return commands that exited with success'),
+                        help='only return commands that exited with success',
                         action='store_true')
     parser.add_argument('--failures_only', '-fo',
-                        help=('only return commands that exited with failure'),
+                        help='only return commands that exited with failure',
                         action='store_true')
     # Other filters.
-    parser.add_argument('-w', metavar=('/folder'),
-                        help=('working directory'), default='')
+    parser.add_argument('-w', metavar='/folder',
+                        help='working directory', default='')
     parser.add_argument(
-        '-d', metavar=('2016-10-01'),
-        help=('date in YYYY-MM-DD, YYYY-MM, or YYYY format'), default='')
+        '-d', metavar='2016-10-01',
+        help='date in YYYY-MM-DD, YYYY-MM, or YYYY format', default='')
     parser.add_argument(
         '--return_self',
-        help=('Return `recent` commands also in the output'),
+        help='Return `recent` commands also in the output',
         action='store_true')
     # Hide time. This makes copy-pasting simpler.
     parser.add_argument(
         '--hide_time', '-ht',
-        help=('dont display time in command output'), action='store_true')
+        help='dont display time in command output', action='store_true')
     # Query type - regex/sql.
     parser.add_argument(
-        '-re', help=('enable regex search pattern'), action='store_true')
+        '-re', help='enable regex search pattern', action='store_true')
     parser.add_argument(
-        '-sql', help=('enable sqlite search pattern'), action='store_true')
+        '-sql', help='enable sqlite search pattern', action='store_true')
     return parser
 
 
