@@ -49,10 +49,10 @@ See example usage at https://asciinema.org/a/271533
 > recent -h
 usage: recent [-h] [-n 20] [--status_num 0] [--successes_only]
               [--failures_only] [-w /folder] [-d 2016-10-01] [--return_self]
-              [--hide_time] [-re] [-sql]
+              [--char_limit 200] [--hide_time] [-re] [-sql]
               [pattern]
 
-recent is a convinient way to query bash history. Visit
+recent is a convenient way to query bash history. Visit
 https://github.com/dotslash/recent2 for more examples or to ask
 questions or to report issues
 
@@ -71,6 +71,8 @@ optional arguments:
   -w /folder            working directory
   -d 2016-10-01         date in YYYY-MM-DD, YYYY-MM, or YYYY format
   --return_self         Return `recent` commands also in the output
+  --char_limit 200, -cl 200
+                        Ignore commands longer than this.
   --hide_time, -ht      dont display time in command output
   -re                   enable regex search pattern
   -sql                  enable sqlite search pattern
@@ -99,7 +101,11 @@ recent -re git.*commit
 - `recent git -w ~/code`. This returns only the commands that were executed with `~/code` as current working directory.
 - Filter the commands by execution date by doing `recent git -d 2019` or `recent git -d 2019-10` or `recent git -d 2019-10-04`
 - By default recent prints command timestamp and the command in the output. Use `recent git --hide_time` or `recent git -ht` to hide the command timestamp. This is useful when copy-pasting commands from output.
-
+- Copy paste errors into the shell can result in random junk coming up 
+  in the bash history. While `-so` option mostly takes care of this, 
+  another way to tackle this is to not show commands that are longer
+  than a given limit. The default is 200. If you want longer commands,
+  then do `recent git --char_limit 10000` or `recent git -cl 10000`
 ### Usage via sqlite
 
 It is possible directly interact with sqlite if all the above options have failed you. See the table schema below.

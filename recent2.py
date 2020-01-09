@@ -300,6 +300,7 @@ def query_builder(args, parser):
     if args.d:
         filters.append(parse_date(args.d))
         parameters.append(args.d)
+    filters.append(f'length(command) < {args.char_limit}')
     try:
         n = int(args.n)
         parameters.append(n)
@@ -348,6 +349,12 @@ def make_arg_parser_for_recent():
         '--return_self',
         help='Return `recent` commands also in the output',
         action='store_true')
+    parser.add_argument(
+        '--char_limit', '-cl',
+        metavar='200',
+        help='Ignore commands longer than this.',
+        default=200)
+
     # Hide time. This makes copy-pasting simpler.
     parser.add_argument(
         '--hide_time', '-ht',
