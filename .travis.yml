@@ -2,14 +2,13 @@ deploy:
   provider: pypi
   user: __token__
   password:
-    secure: bramC7FTYNsNBO07yb1K9H/7drrzO75758232P9ObvTOyJE1WewnwF6p3l/tF0YObFnIU1INCMJXSIr9WHXKYPXzGdYMv02Xjhd1tH5huZxVe1tmKWz4KZzAaIBXz7rpvZW4kmgKvIG50XHITn+lwzNuu70HvKzqpN/Y3/ab5+ZJKo0y+kl2FH8B6etkQIIOc0rEw4jF+RbT1i0PIZOLd3/kgsFNrHx8FijbvNBz45g8V5+Eta6aZKCDbxYEMHSqSo7/pWI8NXezVd1Qxd08zUCRaIN5c2TLAfKShPHTci72A5VaPSDUVu9X9hIBiVYyKCC2lSYQSzzmSRY/xv2GmsVzY3I6ozFHppLMQ+WyQv759Pcc0pmn7psEP5BKgCHMT9nQ3X3HI9siTyVvc1QtSGSn2D8GxSDa6oyqtBmKJBUiJmKp6RI1R4GXc5VrHgEhGsmSlCIZtt44WcGPCgrJvDsiGsESjgvmFt8S9i6A02YdUjuW5UaGIUYJW10bRs6fsJfgcEME/8rds19WnlO/9Hb1TjIEFCkCboqj8PVSDZGT5ZDmigVJSSx1c+rVau0Twwnnu0qFJp0+tMns10a6riqu9vhiiEq3T/9/E9OEJhjoayrdmqt6ASN4WWNNLU3KTX/bXfdhOrYcvKEao20maHwkObYQSPF7VnvuOxvtLs4=
+    secure: bxhX1hH3g2FaGTyQkFsyQU5dtVig4eTcqCjkpbG02GalspUffT5QVMUUSiwWs+oXyJPwQzf0uxgkKmW1kOC5dNmgrWg4oitlNkvNqBl/M8Wq/FOyZ8kE7mbUdSG3n9U9yvW0h2D8wtW0EDwjxBtIu8vU8ltWeB7bYGfJX8IEc3cYlsO5JaqsYxQiA7SCr1lYSSnQJLBAfm31sTfY2zOah0jNlN5f3efHeoH3UEU4zR97y4BOwW9NIUDjsIbmxnseK/weaCXS8KN4+xX1uK/oLmwwQAC5gcBRgkRDiFpjQRGvxHjVukxpl48Vk1fWeASU3Q/Ncd9VlppmIY7ibj2JoAiXfzP9bZPoCWHGzmRTIR81AYRx2sU49kja4igcZ5qs4w8qcupvck9ZdLZJgnZYrAClCYwWOp7/MQr/aIG71D47tTUY31/AQ1aUTdesXDgIxpcV9bYeiC/SankEAsEIC1r6tSp5kb91CiZg01xl9W0ry1Y9dB58U7LIc1tEvKKEY0opL8C2dCFpJXaSG9ppihFC0LgITKWs9AQg1jm3voRmU40zqSqoe8OHO2rpyTwnaizo4J886jkTBcnC+5w0uBZsK+AjK4t0eXbtsyCdEBYTKSP/yrXCcILT8PxHrQi2T48960RgShCb2C+ZExWrB9sCYsJPHgKjW+b34b+6ImU=
   on:
-    # TRAVIS_TAG, TRAVIS_BRANCH has to match the version.txt and the version has to be
-    # major.minor.patch
-    condition: $TRAVIS_TAG =~ [0-9]+[.][0-9]+[.][0-9] && $TRAVIS_TAG == `cat version.txt` && $TRAVIS_TAG == $TRAVIS_BRANCH
+    condition: "$TRAVIS_TAG =~ [0-9]+[.][0-9]+[.][0-9] && $TRAVIS_TAG == `cat version.txt`
+      && $TRAVIS_TAG == $TRAVIS_BRANCH"
     repo: dotslash/recent2
     all_branches: true
 script: skip
 language: python
 python:
-  - "3.5"
+- '3.5'
