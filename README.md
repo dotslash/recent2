@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.com/dotslash/recent2.svg?branch=master)](https://travis-ci.com/dotslash/recent2)
 # Recent
 
 Recent is a more structured way to log your bash history.
