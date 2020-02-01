@@ -300,7 +300,7 @@ def query_builder(args, parser):
     if args.d:
         filters.append(parse_date(args.d))
         parameters.append(args.d)
-    filters.append(f'length(command) < {args.char_limit}')
+    filters.append('length(command) < {}'.format(args.char_limit))
     try:
         n = int(args.n)
         parameters.append(n)
