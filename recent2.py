@@ -23,6 +23,7 @@ class Term:
 
 class SQL:
 
+    CASE_ON = "PRAGMA case_sensitive_like = true"
     INSERT_ROW_CUSTOM_BASE = """insert into commands
         (command_dt, command, pid, return_val, pwd, session)
         values ({}, ?, ?, ?, ?, ?)"""
@@ -258,6 +259,8 @@ def import_bash_history():
     conn.close()
 
 
+# Returns a list of queries to run for the given args
+# Return type: List(Pair(query, List(query_string)))
 def query_builder(args, parser):
     if args.re and args.sql:
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
@@ -307,8 +310,14 @@ def query_builder(args, parser):
     except:
         exit(Term.FAIL + '-n must be a integer' + Term.ENDC)
     where = 'where ' + ' and '.join(filters) if len(filters) > 0 else ''
-    return query.replace('where', where), parameters
 
+    ret = []
+    if not args.nocase:
+        # No params required for case on query.
+        ret.append((SQL.CASE_ON, []))
+    query_and_params = query.replace('where', where), parameters
+    ret.append(query_and_params)
+    return ret
 
 # Returns true if `item` matches `expr`. Used as sqlite UDF.
 def regexp(expr, item):
@@ -364,6 +373,9 @@ def make_arg_parser_for_recent():
         '-re', help='enable regex search pattern', action='store_true')
     parser.add_argument(
         '-sql', help='enable sqlite search pattern', action='store_true')
+    parser.add_argument(
+        '--nocase', '-nc',
+        help='Ignore case when searching for patterns', action='store_true')
     return parser
 
 
@@ -392,14 +404,14 @@ def main():
     # Install REGEXP sqlite UDF.
     conn.create_function("REGEXP", 2, regexp)
     c = conn.cursor()
-    query, parameters = query_builder(args, parser)
-    for row in c.execute(query, parameters):
-        if not(row[0] and row[1]):
-            continue
-        if args.hide_time:
-            print(row[1])
-        if not args.hide_time:
-            print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
+    for query, parameters in query_builder(args, parser):
+        for row in c.execute(query, parameters):
+            if not(row[0] and row[1]):
+                continue
+            if args.hide_time:
+                print(row[1])
+            if not args.hide_time:
+                print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
     conn.close()
 
 
