@@ -5,11 +5,11 @@ from codecs import open
 import fastentrypoints  # noqa: F401
 
 LONG_DESCRIPTION = open('README.md').read()
-
+VERSION = open("version.txt").read()
 
 setup(
     name='recent2',
-    version='0.2.5',
+    version=VERSION,
     description='Logs bash history to an sqlite database',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
