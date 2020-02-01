@@ -36,4 +36,5 @@ setup(
             'recent=recent2:main',
         ],
     },
+    python_requires='>=3'
 )
