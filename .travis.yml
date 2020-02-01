@@ -9,6 +9,7 @@ deploy:
     repo: dotslash/recent2
     # Only master
     branch: master
+script: skip
 language: python
 python:
   - "3.4"
