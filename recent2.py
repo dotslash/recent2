@@ -24,6 +24,7 @@ class Term:
 class SQL:
 
     CASE_ON = "PRAGMA case_sensitive_like = true"
+    GET_SCHEMA = "select sql from sqlite_master where type = 'table' and name = 'commands';"
     INSERT_ROW_CUSTOM_BASE = """insert into commands
         (command_dt, command, pid, return_val, pwd, session)
         values ({}, ?, ?, ?, ?, ?)"""
@@ -287,7 +288,7 @@ def query_builder(args, parser):
         parameters.append(args.status_num)
     if not args.return_self:
         # Dont return recent commands unless user asks for it.
-        filters.append('command not like "recent%"')
+        filters.append("""command not like 'recent%'""")
     if args.pattern:
         if args.re:
             filters.append('command REGEXP ?')
@@ -348,7 +349,7 @@ def make_arg_parser_for_recent():
     parser.add_argument('--failures_only', '-fo',
                         help='only return commands that exited with failure',
                         action='store_true')
-    # Other filters.
+    # Other filters/options.
     parser.add_argument('-w', metavar='/folder',
                         help='working directory', default='')
     parser.add_argument(
@@ -363,6 +364,7 @@ def make_arg_parser_for_recent():
         metavar='200',
         help='Ignore commands longer than this.',
         default=200)
+    parser.add_argument('--debug', help='Debug mode', action='store_true')
 
     # Hide time. This makes copy-pasting simpler.
     parser.add_argument(
@@ -403,6 +405,15 @@ def main():
     conn = create_connection()
     # Install REGEXP sqlite UDF.
     conn.create_function("REGEXP", 2, regexp)
+    # Register the queries executed. (Replace new lines with spaces in the query)
+    queries_executed = []
+
+    def update_queries_executed(inp):
+        if inp == SQL.GET_SCHEMA:
+            return
+        trans = inp.replace('\n', ' ')
+        queries_executed.append(trans)
+    conn.set_trace_callback(update_queries_executed)
     c = conn.cursor()
     for query, parameters in query_builder(args, parser):
         for row in c.execute(query, parameters):
@@ -412,6 +423,16 @@ def main():
                 print(row[1])
             if not args.hide_time:
                 print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
+    if args.debug:
+        schema = None
+        for row in c.execute(SQL.GET_SCHEMA, []):
+            schema = row[0]
+        print("=========DEBUG=========")
+        print("---SCHEMA---")
+        print(schema)
+        print("---QUERIES---")
+        print("To replicate(ish) this output run the following sqlite command")
+        print("""sqlite3 ~/.recent.db "{}" """.format('; '.join(queries_executed)))
     conn.close()
 
 
