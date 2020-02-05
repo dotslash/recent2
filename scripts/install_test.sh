@@ -11,6 +11,6 @@ export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 echo "wow"
 date
 # check if recent shows these.
-recent-import-bash-history
+history
 recent
 recent
