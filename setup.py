@@ -36,8 +36,5 @@ setup(
             'recent=recent2:main',
         ],
     },
-    install_requires=[
-        'fastentrypoints',
-    ],
     python_requires='>=3'
 )
