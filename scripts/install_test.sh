@@ -7,6 +7,7 @@ code_dir=$(pwd)
 echo $code_dir
 cd $HOME
 pwd
+pip uninstall recent2 || true
 pip install -e $code_dir
 # update prompt command. Otherwise recent command will fail.
 export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
