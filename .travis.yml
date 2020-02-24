@@ -15,9 +15,9 @@ install:
   - conda update -q conda
   # Useful for debugging any issues with conda
   - conda info -a
+  # Create a test env with the desired python version
   - conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION
   - conda activate testenv
-  - python setup.py install
 script: bash scripts/install_test.sh
 deploy:
   provider: pypi

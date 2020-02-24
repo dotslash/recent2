@@ -4,7 +4,7 @@ from setuptools import setup
 from codecs import open
 
 LONG_DESCRIPTION = open('README.md').read()
-VERSION = open("version.txt").read()
+VERSION = open("version.txt").read().strip()
 
 setup(
     name='recent2',
