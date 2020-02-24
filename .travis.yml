@@ -1,6 +1,8 @@
 deploy:
   provider: pypi
   user: __token__
+  # Distribute only wheel. No sdist
+  distributions: "bdist_wheel" 
   password:
     secure: j2C/JN/4CW6zVX5A30g7XwRiXQ+xShlHsZuAaKfObsJWUNsA6M72XBvfqNRgPtCLVkcSmWPj12gwjsI4FY0u6Y7WLi16LlU80PysUYs6HsdXHXmZ78N46eZpIr3Ikj2XYgWleMaA+dSeGoWdtpMxafu/NBsMlf2ZELMlb45Yo2w9Y8rFF5/0vMHsFjG6kvzsoT7lAwb3U0u2uGrLDdyQSY/MVo6G/mOzra6uEK8F4ed49thJWDQa2/TNKln4CreYCphiy9UtJ7/irqamxHifJGYBuCu7hTrZJ4Ff5rfT0I5NAa4uaTGsFIxM4JN1HTiHcJfKuaLWiCGgs0i53qsxy5IKvZ70qQ+T9yWcGVbD5Qwc3V+di8jEpz4Nqj+HzzuK26vXSa9grxhIq0/ybGK9kOX+xgSHOg7/fl4gcqTTfTExUxPtELDFb112BWuTjpdTvTDnXYRhqcv+9KIXdibWicbazI4FyAu+l5v3OjcWBMxcYBXzHCgtsvmeNC+mcTC3OxkIONmh3oQ56IlexE8OHxuQdn3DY23lvB44K1oRmkthBAUpJ5MX5HQCskBeXFN2uLazuxPzMMtNO7IuKhYFq0M3BpzwrW1Z7Q8zYC7aifyrnjkMQuHUmwCJr5ldkXp9OVCdgF+LMd1QOJkEzIuZYwmRvZkDv7i0xlMIFsj/21k=
   on:
