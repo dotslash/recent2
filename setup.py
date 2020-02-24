@@ -2,7 +2,6 @@
 
 from setuptools import setup
 from codecs import open
-import fastentrypoints  # noqa: F401
 
 LONG_DESCRIPTION = open('README.md').read()
 VERSION = open("version.txt").read()
