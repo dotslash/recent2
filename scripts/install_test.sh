@@ -16,5 +16,6 @@ log-recent -r 1 -c " 124 some other command" -p 3455
 # Run the recent command just so that we know it kind of works.
 recent > /tmp/out
 # Grep for the commands. Grep returns failure if it does not find the text.
+cat /tmp/out
 grep "some command" /tmp/out
 grep "some other command" /tmp/out
