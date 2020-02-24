@@ -31,4 +31,3 @@ deploy:
       && $TRAVIS_TAG == $TRAVIS_BRANCH"
     repo: dotslash/recent2
     all_branches: true
-

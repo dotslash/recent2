@@ -14,15 +14,15 @@ pip install dist/recent2-*-py3-none-any.whl
 # update prompt command. Otherwise recent command will fail.
 export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 
-# Initialize the session. "command from different session" will not 
-# be recorded.
+# Initialize the session for pid 4556. 
+# "command from different session" will not be recorded.
 log-recent -r 0 -c " 122 command from different session" -p 4556
-# Explicitly log "some command" with pid 4556 and return value 0
+# Explicitly log "some command" return value 0
 log-recent -r 0 -c " 123 some command" -p 4556
-# Explicitly log "some other command" with pid 4556 and return value 1
-log-recent -r 1 -c " 124 some other command" -p 3455
+# Explicitly log "some other command" return value 1
+log-recent -r 1 -c " 124 some other command" -p 4556
 
-# Run the recent command just so that we know it kind of works.
+# Run recent command and output to a tmp file.
 recent > /tmp/out
 # Grep for the commands. Grep returns failure if it does not find the text.
 cat /tmp/out # For debugging.
