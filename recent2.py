@@ -1,16 +1,17 @@
 #!/usr/bin/env python
+import json
 import sqlite3
 import os
 import argparse
 import hashlib
 import re
 import socket
+from pathlib import PurePath
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Term:
-
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -22,33 +23,41 @@ class Term:
 
 
 class SQL:
-
     CASE_ON = "PRAGMA case_sensitive_like = true"
-    GET_SCHEMA = "select sql from sqlite_master where type = 'table' and name = 'commands';"
+    GET_COMMANDS_TABLE_SCHEMA = """
+        select sql from sqlite_master where type = 'table' and name = 'commands';"""
     INSERT_ROW_CUSTOM_BASE = """insert into commands
-        (command_dt, command, pid, return_val, pwd, session)
-        values ({}, ?, ?, ?, ?, ?)"""
-    INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')")
-    INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')")
+        (command_dt, command, pid, return_val, pwd, session, json_data)
+        values ({}, ?, ?, ?, ?, ?, {})"""
+    # Replace INSERT_ROW_CUSTOM_BASE's first param with datatime and 2nd param with {} again.
+    # NOTE(dotslash): I haven't found a way to send json using ?s. So doing with string formats.
+    INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')", "{}")
+    INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')", "null")
     INSERT_SESSION = """insert into sessions (created_dt, updated_dt,
         term, hostname, user, sequence, session)
         values (datetime('now','localtime'), datetime('now','localtime'), ?, ?, ?, ?, ?)"""
     UPDATE_SESSION = """update sessions set updated_dt = datetime('now','localtime'), sequence = ?
         where session = ?"""
-    TAIL_N_ROWS = """select command_dt, command from (select * from commands where
-        order by command_dt desc limit ?) order by command_dt"""
+    # TAIL_N_ROWS's columns (column order is same as TAIL_N_ROWS
+    COLUMNS = 'command_dt,command,pid,return_val,pwd,session,json_data'.split(',')
+    TAIL_N_ROWS = """select command_dt, command, pid, return_val, pwd, session, json_data
+                     from (select * from commands where
+                     order by command_dt desc limit ?) order by command_dt"""
+    GET_SESSION_SEQUENCE = """select sequence from sessions where session = ?"""
+
+    # Setup: Create tables.
     CREATE_COMMANDS_TABLE = """create table if not exists commands
-        (command_dt timestamp, command text, pid int, return_val int, pwd text, session text)"""
+        (command_dt timestamp, command text, pid int, return_val int, pwd text, session text,
+         json_data json)"""
     CREATE_SESSIONS_TABLE = """create table if not exists sessions
         (session text primary key not null, created_dt timestamp, updated_dt timestamp,
         term text, hostname text, user text, sequence int)"""
     CREATE_DATE_INDEX = """create index if not exists command_dt_ind on commands (command_dt)"""
-    CHECK_COMMANDS_TABLE = """select count(*) as count from sqlite_master where type='table'
-        and name='commands'"""
-    GET_SESSION_SEQUENCE = """select sequence from sessions where session = ?"""
+    # Schema version
     GET_SCHEMA_VERSION = """pragma user_version"""
     UPDATE_SCHEMA_VERSION = """pragma user_version = """
-    MIGRATE_0_1 = "alter table commands add column session text"
+    # Migrate from v1 to v2.
+    MIGRATE_1_2 = "alter table commands add column json_data json"
 
 
 class Session:
@@ -89,19 +98,19 @@ class Session:
 
 
 def migrate(version, conn):
-    if version > SCHEMA_VERSION:
+    if version not in (0, 1):
         exit(Term.FAIL + ('recent: your command history database does not '
                           'match recent, please update') + Term.ENDC)
 
     c = conn.cursor()
-    if version == 0:
-        if c.execute(SQL.CHECK_COMMANDS_TABLE).fetchone()[0] != 0:
-            print(Term.WARNING +
-                  'recent: migrating schema to version {}'.format(SCHEMA_VERSION) +
-                  Term.ENDC)
-            c.execute(SQL.MIGRATE_0_1)
-        else:
-            print(Term.WARNING + 'recent: building schema' + Term.ENDC)
+    if version == 1:
+        # Schema version is v1. Migrate to v2.
+        print(Term.WARNING +
+              'recent: migrating schema to version {}'.format(SCHEMA_VERSION) +
+              Term.ENDC)
+        c.execute(SQL.MIGRATE_1_2)
+    else:
+        print(Term.WARNING + 'recent: building schema' + Term.ENDC)
         c.execute(SQL.CREATE_COMMANDS_TABLE)
         c.execute(SQL.CREATE_SESSIONS_TABLE)
         c.execute(SQL.CREATE_DATE_INDEX)
@@ -147,6 +156,23 @@ def build_schema(conn):
         migrate(0, conn)
 
 
+def envvars_to_log():
+    envvar_whitelist = {k.strip() for k in os.getenv('RECENT_ENV_VARS', '').split(',') if k.strip()}
+
+    def is_var_interesting(name: str):
+        # Anything starting with RECENT_ is welcome.
+        if name.startswith("RECENT_"):
+            return True
+        for interesting_var in envvar_whitelist:
+            # if name matches glob(interesting_var) then we will store it.
+            # E.g - CONDA_* => we are interested in all env vars that start with CONDA_.
+            if PurePath(name).match(interesting_var):
+                return True
+        return False
+
+    return {k: v for k, v in os.environ.items() if is_var_interesting(k)}
+
+
 # Entry point to recent-log command.
 def log():
     parser = argparse.ArgumentParser()
@@ -175,8 +201,8 @@ def log():
 
     if not session.empty:
         c = conn.cursor()
-        c.execute(SQL.INSERT_ROW, [command, pid,
-                                   return_value, pwd, session.id])
+        json_data = "json('{}')".format(json.dumps({'env': envvars_to_log()}))
+        c.execute(SQL.INSERT_ROW.format(json_data), [command, pid, return_value, pwd, session.id])
 
     conn.commit()
     conn.close()
@@ -255,7 +281,7 @@ def import_bash_history():
             cmd_ts, cmd, pid,
             # exit status=-1, working directory=/unknown
             -1, "/unknown",
-            session.id])
+            session.id, ""])
     conn.commit()
     conn.close()
 
@@ -304,6 +330,13 @@ def query_builder(args, parser):
     if args.d:
         filters.append(parse_date(args.d))
         parameters.append(args.d)
+    for env_var in args.env:
+        split = env_var.split(":")
+        if len(split) == 1:
+            filters.append('json_extract(json_data, "$.env.{}") is not null'.format(split[0]))
+        else:
+            filters.append('json_extract(json_data, "$.env.{}") = ?'.format(split[0]))
+            parameters.append(split[1])
     filters.append('length(command) < {}'.format(args.char_limit))
     try:
         n = int(args.n)
@@ -319,6 +352,7 @@ def query_builder(args, parser):
     query_and_params = query.replace('where', where), parameters
     ret.append(query_and_params)
     return ret
+
 
 # Returns true if `item` matches `expr`. Used as sqlite UDF.
 def regexp(expr, item):
@@ -364,12 +398,26 @@ def make_arg_parser_for_recent():
         metavar='200',
         help='Ignore commands longer than this.',
         default=200)
-    parser.add_argument('--debug', help='Debug mode', action='store_true')
+    parser.add_argument(
+        '-e', '--env',
+        action='append',
+        help='Filter by shell env vars',
+        metavar='key[:val]',
+        default=[])
 
+    # CONTROL OUTPUT FORMAT
     # Hide time. This makes copy-pasting simpler.
     parser.add_argument(
         '--hide_time', '-ht',
         help='dont display time in command output', action='store_true')
+    parser.add_argument('--debug', help='Debug mode', action='store_true')
+    parser.add_argument('--detail', help='Return detailed output', action='store_true')
+    parser.add_argument(
+        '--columns',
+        help=('Comma separated columns to print if --detail is passed. Valid columns are '
+              'command_dt,command,pid,return_val,pwd,session,json_data'),
+        default="command_dt,command,json_data")
+
     # Query type - regex/sql.
     parser.add_argument(
         '-re', help='enable regex search pattern', action='store_true')
@@ -409,23 +457,42 @@ def main():
     queries_executed = []
 
     def update_queries_executed(inp):
-        if inp == SQL.GET_SCHEMA:
+        if inp == SQL.GET_COMMANDS_TABLE_SCHEMA:
             return
         trans = inp.replace('\n', ' ')
         queries_executed.append(trans)
+
     conn.set_trace_callback(update_queries_executed)
     c = conn.cursor()
+    detail_results = []
+    columns_to_print = args.columns.split(',')
     for query, parameters in query_builder(args, parser):
         for row in c.execute(query, parameters):
-            if not(row[0] and row[1]):
+            row_dict = {SQL.COLUMNS[i]: row[i]
+                        for i in range(len(row))
+                        if SQL.COLUMNS[i] in columns_to_print}
+            if not (row_dict['command_dt'] and row_dict['command']):
+                continue
+            if args.detail:
+                detail_results.append(row_dict)
                 continue
             if args.hide_time:
-                print(row[1])
+                print(row_dict['command'])
             if not args.hide_time:
-                print(Term.WARNING + row[0] + Term.ENDC + ' ' + row[1])
+                print(Term.WARNING + row_dict['command_dt'] + Term.ENDC + ' ' + row_dict['command'])
+    if args.detail:
+        if 'json_data' not in columns_to_print:
+            from tabulate import tabulate
+            print(tabulate(detail_results, headers="keys"))
+        else:
+            for res in detail_results:
+                for k, v in res.items():
+                    print(Term.BOLD + Term.OKBLUE + k + Term.ENDC + ": " + str(v))
+                print("---------------------------------")
+
     if args.debug:
         schema = None
-        for row in c.execute(SQL.GET_SCHEMA, []):
+        for row in c.execute(SQL.GET_COMMANDS_TABLE_SCHEMA, []):
             schema = row[0]
         print("=========DEBUG=========")
         print("---SCHEMA---")
