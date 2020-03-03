@@ -44,7 +44,8 @@ class SQL:
 
     # Setup: Create tables.
     CREATE_COMMANDS_TABLE = """create table if not exists commands
-        (command_dt timestamp, command text, pid int, return_val int, pwd text, session text)"""
+        (command_dt timestamp, command text, pid int, return_val int, pwd text, session text,
+         json_data json)"""
     CREATE_SESSIONS_TABLE = """create table if not exists sessions
         (session text primary key not null, created_dt timestamp, updated_dt timestamp,
         term text, hostname text, user text, sequence int)"""
