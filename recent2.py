@@ -466,12 +466,14 @@ def main():
     c = conn.cursor()
     detail_results = []
     columns_to_print = args.columns.split(',')
+    columns_to_print.extend(['command_dt', 'command'])
     for query, parameters in query_builder(args, parser):
         for row in c.execute(query, parameters):
             row_dict = {SQL.COLUMNS[i]: row[i]
                         for i in range(len(row))
                         if SQL.COLUMNS[i] in columns_to_print}
-            if not (row_dict['command_dt'] and row_dict['command']):
+            if 'command_dt' not in row_dict or 'command' not in row_dict:
+                # Why would we have these entries?
                 continue
             if args.detail:
                 detail_results.append(row_dict)
