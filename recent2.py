@@ -120,7 +120,7 @@ def migrate(version, conn):
 
 
 def parse_history(history):
-    match = re.search(r'^\s+(\d+)\s+(.*)$', history,
+    match = re.search(r'^\s*(\d+)\s+(.*)$', history,
                       re.MULTILINE and re.DOTALL)
     if match:
         return match.group(1), match.group(2)
