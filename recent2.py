@@ -403,7 +403,7 @@ def make_arg_parser_for_recent():
     parser.add_argument(
         '-e', '--env',
         action='append',
-        help='Filter by shell env vars',
+        help='Filter by shell env vars. Env vars set in RECENT_ENV_VARS as comma separated list will be captured.',
         metavar='key[:val]',
         default=[])
 
@@ -431,8 +431,11 @@ def make_arg_parser_for_recent():
     return parser
 
 
-def check_prompt():
-    import os
+def check_prompt(debug):
+    if os.environ.get('RECENT_CUSTOM_PROMPT'):
+        if debug:
+            print("RECENT_CUSTOM_PROMPT is set. Not checking prompt")
+        return
     expected_prompt = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
     actual_prompt = os.environ.get('PROMPT_COMMAND', '')
     export_promot_cmd = \
@@ -449,9 +452,9 @@ def check_prompt():
 
 # Entry point to recent command.
 def main():
-    check_prompt()  # Fail the command if PROMPT_COMMAND is not set
     parser = make_arg_parser_for_recent()
     args = parser.parse_args()
+    check_prompt(args.debug)  # Fail the command if PROMPT_COMMAND is not set
     conn = create_connection()
     # Install REGEXP sqlite UDF.
     conn.create_function("REGEXP", 2, regexp)
