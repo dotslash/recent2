@@ -15,6 +15,7 @@ pip install dist/recent2-*-py3-none-any.whl
 export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 
 # Manually add elements to bash history.
+export HISTFILE=~/.bash_history
 history -s "bash history before recent1"
 history -s "bash history before recent2"
 history -w
