@@ -250,7 +250,8 @@ def import_bash_history():
     #  (1571012545, "echo foo"),
     #  (1571012560, "cat bar")]
     last_ts = -1
-    for line in open(os.path.expanduser("~/.bash_history")):
+    histfile = os.environ.get("HISTFILE", "~/.bash_history")
+    for line in open(os.path.expanduser(histfile)):
         if line[0] == '#':
             try:
                 last_ts = int(line[1:].strip())
