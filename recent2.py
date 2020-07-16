@@ -7,6 +7,7 @@ import hashlib
 import re
 import socket
 from pathlib import PurePath
+from tabulate import tabulate
 
 SCHEMA_VERSION = 2
 
@@ -32,6 +33,7 @@ class SQL:
     # Replace INSERT_ROW_CUSTOM_BASE's first param with datatime and 2nd param with {} again.
     # NOTE(dotslash): I haven't found a way to send json using ?s. So doing with string formats.
     INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')", "{}")
+    # PARAMS: command_time, command, pid, command_return_val, pwd, session
     INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')", "null")
     INSERT_SESSION = """insert into sessions (created_dt, updated_dt,
         term, hostname, user, sequence, session)
@@ -280,8 +282,7 @@ def import_bash_history():
         c.execute(SQL.INSERT_ROW_CUSTOM_TS, [
             cmd_ts, cmd, pid,
             # exit status=-1, working directory=/unknown
-            -1, "/unknown",
-            session.id, ""])
+            -1, "/unknown", session.id])
     conn.commit()
     conn.close()
 
@@ -484,7 +485,6 @@ def main():
                 print(Term.WARNING + row_dict['command_dt'] + Term.ENDC + ' ' + row_dict['command'])
     if args.detail:
         if 'json_data' not in columns_to_print:
-            from tabulate import tabulate
             print(tabulate(detail_results, headers="keys"))
         else:
             for res in detail_results:

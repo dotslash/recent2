@@ -35,5 +35,8 @@ setup(
             'recent=recent2:main',
         ],
     },
-    python_requires='>=3'
+    python_requires='>=3',
+    install_requires=[
+        'tabulate'
+    ]
 )
