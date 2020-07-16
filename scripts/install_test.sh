@@ -17,6 +17,7 @@ export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 # Manually add elements to bash history.
 history -s "bash history before recent1"
 history -s "bash history before recent2"
+history -w
 echo $HISTFILE
 cat $HISTFILE
 # Import bash history.
