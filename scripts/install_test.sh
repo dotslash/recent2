@@ -17,13 +17,15 @@ export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 # Manually add elements to bash history.
 history -s "bash history before recent1"
 history -s "bash history before recent2"
+echo $HISTFILE
+cat $HISTFILE
 # Import bash history.
 recent-import-bash-history
 # Check for the imported bash history.
+recent > /tmp/out
 grep "bash history before recent1" /tmp/out
 grep "bash history before recent1" /tmp/out
-
-# Initialize the session for pid 4556. 
+# Initialize the session for pid 4556.
 # "command from different session" will not be recorded.
 log-recent -r 0 -c " 122 command from different session" -p 4556
 # Explicitly log "some command" return value 0
