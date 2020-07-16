@@ -403,7 +403,7 @@ def make_arg_parser_for_recent():
     parser.add_argument(
         '-e', '--env',
         action='append',
-        help='Filter by shell env vars',
+        help='Filter by shell env vars. Env vars set in RECENT_ENV_VARS as comma separated list will be captured.',
         metavar='key[:val]',
         default=[])
 

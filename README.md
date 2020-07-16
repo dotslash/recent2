@@ -50,7 +50,8 @@ See example usage at https://asciinema.org/a/271533
 > recent -h
 usage: recent [-h] [-n 20] [--status_num 0] [--successes_only]
               [--failures_only] [-w /folder] [-d 2016-10-01] [--return_self]
-              [--char_limit 200] [--hide_time] [-re] [-sql]
+              [--char_limit 200] [-e key[:val]] [--hide_time] [--debug]
+              [--detail] [--columns COLUMNS] [-re] [-sql] [--nocase]
               [pattern]
 
 recent is a convenient way to query bash history. Visit
@@ -74,9 +75,19 @@ optional arguments:
   --return_self         Return `recent` commands also in the output
   --char_limit 200, -cl 200
                         Ignore commands longer than this.
+  -e key[:val], --env key[:val]
+                        Filter by shell env vars. Env vars set in
+                        RECENT_ENV_VARS as comma separated list will be
+                        captured.
   --hide_time, -ht      dont display time in command output
+  --debug               Debug mode
+  --detail              Return detailed output
+  --columns COLUMNS     Comma separated columns to print if --detail is
+                        passed. Valid columns are command_dt,command,pid,retur
+                        n_val,pwd,session,json_data
   -re                   enable regex search pattern
   -sql                  enable sqlite search pattern
+  --nocase, -nc         Ignore case when searching for patterns
 
 To import bash history into recent db run recent-import-bash-history
 ```
@@ -124,6 +135,15 @@ CREATE INDEX command_dt_ind on commands (command_dt);
 
 - option1: `recent -sql 'command like "%git%" and command not like "%commit%"'`
 - option2: You can directly play around with sqlite `sqlite3 ~/.recent.db "select * from commands limit 10"`
+
+### FAQs
+
+**Q**: Can I have a custom location to store my history sqlite file?   
+**A**: Yes. Point RECENT_DB environment variable to your sqlite file.   
+
+**Q**: I want to have a custom PROMPT_COMMAND that calls recent using my own logic. How do I do that?  
+**A**: This is basically https://github.com/dotslash/recent2/issues/32. Set RECENT_CUSTOM_PROMPT environment variable 
+       to a non empty value.  
 
 ## Dev installation instructions
 
