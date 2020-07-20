@@ -141,9 +141,9 @@ CREATE INDEX command_dt_ind on commands (command_dt);
 **Q**: Can I have a custom location to store my history sqlite file?   
 **A**: Yes. Point RECENT_DB environment variable to your sqlite file.   
 
-**Q**: I want to have a custom PROMPT_COMMAND that calls recent using my own logic. How do I do that?  
+**Q**: I want to have a custom PROMPT_COMMAND that calls log-recent using my own logic. How do I do that?  
 **A**: This is basically https://github.com/dotslash/recent2/issues/32. Set RECENT_CUSTOM_PROMPT environment variable 
-       to a non empty value.  
+       to a non empty value.
 
 ## Dev installation instructions
 
