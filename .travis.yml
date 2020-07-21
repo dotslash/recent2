@@ -18,7 +18,9 @@ install:
   # Create a test env with the desired python version
   - conda create -q -n testenv python=$TRAVIS_PYTHON_VERSION
   - conda activate testenv
-script: bash scripts/install_test.sh
+script:
+  - python recent2_test.py -v
+  - bash scripts/install_test.sh
 deploy:
   provider: pypi
   user: __token__
