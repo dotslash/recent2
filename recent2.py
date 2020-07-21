@@ -9,7 +9,6 @@ import socket
 from pathlib import PurePath
 from tabulate import tabulate
 
-SCHEMA_VERSION = 2
 
 
 class Term:
@@ -23,38 +22,90 @@ class Term:
     UNDERLINE = '\033[4m'
 
 
-class SQL:
+class DB:
+    SCHEMA_VERSION = 2
     CASE_ON = "PRAGMA case_sensitive_like = true"
     GET_COMMANDS_TABLE_SCHEMA = """
-        select sql from sqlite_master where type = 'table' and name = 'commands';"""
-    INSERT_ROW_CUSTOM_BASE = """insert into commands
-        (command_dt, command, pid, return_val, pwd, session, json_data)
-        values ({}, ?, ?, ?, ?, ?, {})"""
-    # Replace INSERT_ROW_CUSTOM_BASE's first param with datatime and 2nd param with {} again.
+        select sql 
+        from sqlite_master 
+        where type = 'table' and name = 'commands'"""
     # NOTE(dotslash): I haven't found a way to send json using ?s. So doing with string formats.
-    INSERT_ROW = INSERT_ROW_CUSTOM_BASE.format("datetime('now', 'localtime')", "{}")
-    # PARAMS: command_time, command, pid, command_return_val, pwd, session
-    INSERT_ROW_CUSTOM_TS = INSERT_ROW_CUSTOM_BASE.format("datetime(?, 'unixepoch')", "null")
-    INSERT_SESSION = """insert into sessions (created_dt, updated_dt,
-        term, hostname, user, sequence, session)
-        values (datetime('now','localtime'), datetime('now','localtime'), ?, ?, ?, ?, ?)"""
-    UPDATE_SESSION = """update sessions set updated_dt = datetime('now','localtime'), sequence = ?
+    INSERT_ROW = """
+        insert into commands
+            (command_dt,command,pid,return_val,pwd,session,json_data)
+            values (
+                datetime('now', 'localtime'), -- command_dt
+                ?, -- command
+                ?, -- pid
+                ?, -- return_val
+                ?, -- pwd
+                ?, -- session
+                {} -- json_data
+            )"""
+    INSERT_ROW_CUSTOM_TS = """
+        insert into commands
+            (command_dt,command,pid,return_val,pwd,session,json_data)
+            values (
+                datetime(?, 'unixepoch'), -- command_dt
+                ?, -- command
+                ?, -- pid
+                ?, -- return_val
+                ?, -- pwd
+                ?, -- session
+                null -- json_data
+            )"""
+    INSERT_SESSION = """
+        insert into sessions 
+            (created_dt, updated_dt, term, hostname, user, sequence, session)
+            values (
+                datetime('now','localtime'), datetime('now','localtime'), -- created_dt, updated_dt
+                ?, -- term
+                ?, -- hostname
+                ?, -- user
+                ?, -- sequence
+                ?  -- session
+            )"""
+    UPDATE_SESSION = """
+        update sessions 
+        set updated_dt = datetime('now','localtime'), sequence = ?
         where session = ?"""
     # TAIL_N_ROWS's columns (column order is same as TAIL_N_ROWS
-    COLUMNS = 'command_dt,command,pid,return_val,pwd,session,json_data'.split(',')
-    TAIL_N_ROWS = """select command_dt, command, pid, return_val, pwd, session, json_data
-                     from (select * from commands where
-                     order by command_dt desc limit ?) order by command_dt"""
+    TAIL_N_ROWS_COLUMNS = 'command_dt,command,pid,return_val,pwd,session,json_data'.split(',')
+    TAIL_N_ROWS_TEMPLATE = """
+        select command_dt,command,pid,return_val,pwd,session,json_data
+        from (
+            select * 
+            from commands 
+            where
+            order by command_dt desc limit ?
+        )
+        order by command_dt"""
     GET_SESSION_SEQUENCE = """select sequence from sessions where session = ?"""
 
     # Setup: Create tables.
-    CREATE_COMMANDS_TABLE = """create table if not exists commands
-        (command_dt timestamp, command text, pid int, return_val int, pwd text, session text,
-         json_data json)"""
-    CREATE_SESSIONS_TABLE = """create table if not exists sessions
-        (session text primary key not null, created_dt timestamp, updated_dt timestamp,
-        term text, hostname text, user text, sequence int)"""
-    CREATE_DATE_INDEX = """create index if not exists command_dt_ind on commands (command_dt)"""
+    CREATE_COMMANDS_TABLE = """
+        create table if not exists commands (
+            command_dt timestamp,
+            command text,
+            pid int,
+            return_val int,
+            pwd text,
+            session text,
+            json_data json
+        )"""
+    CREATE_SESSIONS_TABLE = """
+        create table if not exists sessions (
+            session text primary key not null, 
+            created_dt timestamp,
+            updated_dt timestamp,
+            term text,
+            hostname text,
+            user text,
+            sequence int
+        )"""
+    CREATE_DATE_INDEX = """
+        create index if not exists command_dt_ind 
+            on commands (command_dt)"""
     # Schema version
     GET_SCHEMA_VERSION = """pragma user_version"""
     UPDATE_SCHEMA_VERSION = """pragma user_version = """
@@ -89,14 +140,14 @@ class Session:
             term = os.getenv('TERM', '')
             hostname = socket.gethostname()
             user = os.getenv('USER', '')
-            c.execute(SQL.INSERT_SESSION,
+            c.execute(DB.INSERT_SESSION,
                       [term, hostname, user, self.sequence, self.id])
             self.empty = True
         except sqlite3.IntegrityError:
             # Carriage returns need to be ignored
-            if c.execute(SQL.GET_SESSION_SEQUENCE, [self.id]).fetchone()[0] == int(self.sequence):
+            if c.execute(DB.GET_SESSION_SEQUENCE, [self.id]).fetchone()[0] == int(self.sequence):
                 self.empty = True
-            c.execute(SQL.UPDATE_SESSION, [self.sequence, self.id])
+            c.execute(DB.UPDATE_SESSION, [self.sequence, self.id])
 
 
 def migrate(version, conn):
@@ -108,16 +159,16 @@ def migrate(version, conn):
     if version == 1:
         # Schema version is v1. Migrate to v2.
         print(Term.WARNING +
-              'recent: migrating schema to version {}'.format(SCHEMA_VERSION) +
+              'recent: migrating schema to version {}'.format(DB.SCHEMA_VERSION) +
               Term.ENDC)
-        c.execute(SQL.MIGRATE_1_2)
+        c.execute(DB.MIGRATE_1_2)
     else:
         print(Term.WARNING + 'recent: building schema' + Term.ENDC)
-        c.execute(SQL.CREATE_COMMANDS_TABLE)
-        c.execute(SQL.CREATE_SESSIONS_TABLE)
-        c.execute(SQL.CREATE_DATE_INDEX)
+        c.execute(DB.CREATE_COMMANDS_TABLE)
+        c.execute(DB.CREATE_SESSIONS_TABLE)
+        c.execute(DB.CREATE_DATE_INDEX)
 
-    c.execute(SQL.UPDATE_SCHEMA_VERSION + str(SCHEMA_VERSION))
+    c.execute(DB.UPDATE_SCHEMA_VERSION + str(DB.SCHEMA_VERSION))
     conn.commit()
 
 
@@ -151,8 +202,8 @@ def create_connection():
 def build_schema(conn):
     try:
         c = conn.cursor()
-        current = c.execute(SQL.GET_SCHEMA_VERSION).fetchone()[0]
-        if current != SCHEMA_VERSION:
+        current = c.execute(DB.GET_SCHEMA_VERSION).fetchone()[0]
+        if current != DB.SCHEMA_VERSION:
             migrate(current, conn)
     except (sqlite3.OperationalError, TypeError):
         migrate(0, conn)
@@ -204,7 +255,7 @@ def log():
     if not session.empty:
         c = conn.cursor()
         json_data = "json('{}')".format(json.dumps({'env': envvars_to_log()}))
-        c.execute(SQL.INSERT_ROW.format(json_data), [command, pid, return_value, pwd, session.id])
+        c.execute(DB.INSERT_ROW.format(json_data), [command, pid, return_value, pwd, session.id])
 
     conn.commit()
     conn.close()
@@ -280,7 +331,7 @@ def import_bash_history():
     session.update(conn)
     for cmd_ts, cmd in history:
         c = conn.cursor()
-        c.execute(SQL.INSERT_ROW_CUSTOM_TS, [
+        c.execute(DB.INSERT_ROW_CUSTOM_TS, [
             cmd_ts, cmd, pid,
             # exit status=-1, working directory=/unknown
             -1, "/unknown", session.id])
@@ -290,10 +341,10 @@ def import_bash_history():
 
 # Returns a list of queries to run for the given args
 # Return type: List(Pair(query, List(query_string)))
-def query_builder(args, parser):
+def query_builder(args, print_help_func):
     if args.re and args.sql:
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
-        parser.print_help()
+        print_help_func()
         exit(1)
     num_status_filter = sum(
         1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
@@ -302,9 +353,9 @@ def query_builder(args, parser):
               ('Only one of --successes_only, --failures_only and '
                '--status_num has to be set') +
               Term.ENDC)
-        parser.print_help()
+        print_help_func()
         exit(1)
-    query = SQL.TAIL_N_ROWS
+    query = DB.TAIL_N_ROWS_TEMPLATE
     filters = []
     parameters = []
     if args.successes_only:
@@ -350,7 +401,7 @@ def query_builder(args, parser):
     ret = []
     if not args.nocase:
         # No params required for case on query.
-        ret.append((SQL.CASE_ON, []))
+        ret.append((DB.CASE_ON, []))
     query_and_params = query.replace('where', where), parameters
     ret.append(query_and_params)
     return ret
@@ -438,7 +489,7 @@ def check_prompt(debug):
         return
     expected_prompt = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
     actual_prompt = os.environ.get('PROMPT_COMMAND', '')
-    export_promot_cmd = \
+    export_prompt_cmd = \
         '''export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$' '''
     if expected_prompt not in actual_prompt:
         print(Term.BOLD +
@@ -446,14 +497,11 @@ def check_prompt(debug):
               "Add the following line to .bashrc or .bash_profile" +
               Term.ENDC)
 
-        print(Term.UNDERLINE + export_promot_cmd + Term.ENDC)
+        print(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
         exit(1)
 
 
-# Entry point to recent command.
-def main():
-    parser = make_arg_parser_for_recent()
-    args = parser.parse_args()
+def handle_recent_command(args, print_help_func):
     check_prompt(args.debug)  # Fail the command if PROMPT_COMMAND is not set
     conn = create_connection()
     # Install REGEXP sqlite UDF.
@@ -462,7 +510,7 @@ def main():
     queries_executed = []
 
     def update_queries_executed(inp):
-        if inp == SQL.GET_COMMANDS_TABLE_SCHEMA:
+        if inp == DB.GET_COMMANDS_TABLE_SCHEMA:
             return
         trans = inp.replace('\n', ' ')
         queries_executed.append(trans)
@@ -472,11 +520,11 @@ def main():
     detail_results = []
     columns_to_print = args.columns.split(',')
     columns_to_print.extend(['command_dt', 'command'])
-    for query, parameters in query_builder(args, parser):
+    for query, parameters in query_builder(args, print_help_func):
         for row in c.execute(query, parameters):
-            row_dict = {SQL.COLUMNS[i]: row[i]
+            row_dict = {DB.TAIL_N_ROWS_COLUMNS[i]: row[i]
                         for i in range(len(row))
-                        if SQL.COLUMNS[i] in columns_to_print}
+                        if DB.TAIL_N_ROWS_COLUMNS[i] in columns_to_print}
             if 'command_dt' not in row_dict or 'command' not in row_dict:
                 # Why would we have these entries?
                 continue
@@ -498,7 +546,7 @@ def main():
 
     if args.debug:
         schema = None
-        for row in c.execute(SQL.GET_COMMANDS_TABLE_SCHEMA, []):
+        for row in c.execute(DB.GET_COMMANDS_TABLE_SCHEMA, []):
             schema = row[0]
         print("=========DEBUG=========")
         print("---SCHEMA---")
@@ -507,6 +555,12 @@ def main():
         print("To replicate(ish) this output run the following sqlite command")
         print("""sqlite3 ~/.recent.db "{}" """.format('; '.join(queries_executed)))
     conn.close()
+
+
+def main():
+    parser = make_arg_parser_for_recent()
+    args = parser.parse_args()
+    handle_recent_command(args, parser.print_help)
 
 
 if __name__ == '__main__':
