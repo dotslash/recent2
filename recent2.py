@@ -6,9 +6,9 @@ import argparse
 import hashlib
 import re
 import socket
+import time
 from pathlib import PurePath
 from tabulate import tabulate
-
 
 
 class Term:
@@ -20,6 +20,9 @@ class Term:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+
+EXPECTED_PROMPT = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 
 
 class DB:
@@ -34,7 +37,7 @@ class DB:
         insert into commands
             (command_dt,command,pid,return_val,pwd,session,json_data)
             values (
-                datetime('now', 'localtime'), -- command_dt
+                datetime(?, 'unixepoch'), -- command_dt
                 ?, -- command
                 ?, -- pid
                 ?, -- return_val
@@ -42,7 +45,7 @@ class DB:
                 ?, -- session
                 {} -- json_data
             )"""
-    INSERT_ROW_CUSTOM_TS = """
+    INSERT_ROW_NO_JSON = """
         insert into commands
             (command_dt,command,pid,return_val,pwd,session,json_data)
             values (
@@ -145,18 +148,20 @@ class Session:
             self.empty = True
         except sqlite3.IntegrityError:
             # Carriage returns need to be ignored
-            if c.execute(DB.GET_SESSION_SEQUENCE, [self.id]).fetchone()[0] == int(self.sequence):
+            expected_sequence = c.execute(DB.GET_SESSION_SEQUENCE, [self.id]).fetchone()[0]
+            if expected_sequence == int(self.sequence):
                 self.empty = True
             c.execute(DB.UPDATE_SESSION, [self.sequence, self.id])
+        c.close()
 
 
-def migrate(version, conn):
-    if version not in (0, 1):
+def migrate(cur_version, conn):
+    if cur_version not in (0, 1):
         exit(Term.FAIL + ('recent: your command history database does not '
                           'match recent, please update') + Term.ENDC)
 
     c = conn.cursor()
-    if version == 1:
+    if cur_version == 1:
         # Schema version is v1. Migrate to v2.
         print(Term.WARNING +
               'recent: migrating schema to version {}'.format(DB.SCHEMA_VERSION) +
@@ -194,7 +199,7 @@ def parse_date(date_format):
 
 def create_connection():
     recent_db = os.getenv('RECENT_DB', os.environ['HOME'] + '/.recent.db')
-    conn = sqlite3.connect(recent_db)
+    conn = sqlite3.connect(recent_db, uri=recent_db.startswith("file:"))
     build_schema(conn)
     return conn
 
@@ -229,10 +234,10 @@ def envvars_to_log():
 # Entry point to recent-log command.
 def log():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--return_value', help='set to $?', default=0)
+    parser.add_argument('-r', '--return_value', help='Command return value. Set to $?', default=0)
     parser.add_argument('-c', '--command',
-                        help='set to $(HISTTIMEFORMAT= history 1)', default='')
-    parser.add_argument('-p', '--pid', help='set to $$', default=0)
+                        help='Set to $(HISTTIMEFORMAT= history 1)', default='')
+    parser.add_argument('-p', '--pid', help='Shell pid. Set to $$', default=0)
     args = parser.parse_args()
 
     sequence, command = parse_history(args.command)
@@ -247,7 +252,10 @@ def log():
         print("""export PROMPT_COMMAND="""
               """'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
         exit(1)
+    log_command(command=command, pid=pid, sequence=sequence, return_value=return_value, pwd=pwd)
 
+
+def log_command(command, pid, sequence, return_value, pwd):
     conn = create_connection()
     session = Session(pid, sequence)
     session.update(conn)
@@ -255,7 +263,8 @@ def log():
     if not session.empty:
         c = conn.cursor()
         json_data = "json('{}')".format(json.dumps({'env': envvars_to_log()}))
-        c.execute(DB.INSERT_ROW.format(json_data), [command, pid, return_value, pwd, session.id])
+        # We pass current time instead of using 'now' in sql to mock this value.
+        c.execute(DB.INSERT_ROW.format(json_data), [int(time.time()), command, pid, return_value, pwd, session.id])
 
     conn.commit()
     conn.close()
@@ -331,7 +340,7 @@ def import_bash_history():
     session.update(conn)
     for cmd_ts, cmd in history:
         c = conn.cursor()
-        c.execute(DB.INSERT_ROW_CUSTOM_TS, [
+        c.execute(DB.INSERT_ROW_NO_JSON, [
             cmd_ts, cmd, pid,
             # exit status=-1, working directory=/unknown
             -1, "/unknown", session.id])
@@ -487,11 +496,10 @@ def check_prompt(debug):
         if debug:
             print("RECENT_CUSTOM_PROMPT is set. Not checking prompt")
         return
-    expected_prompt = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
     actual_prompt = os.environ.get('PROMPT_COMMAND', '')
     export_prompt_cmd = \
         '''export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$' '''
-    if expected_prompt not in actual_prompt:
+    if EXPECTED_PROMPT not in actual_prompt:
         print(Term.BOLD +
               "PROMPT_COMMAND env variable is not set. " +
               "Add the following line to .bashrc or .bash_profile" +
