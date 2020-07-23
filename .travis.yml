@@ -2,9 +2,10 @@ language: python
 python:
   - '3.5'
 install:
-  - pip install tabulate
+  - pip install tabulate # dependency.
+  - pip install codecov # code coverage.
 script:
-  - python recent2_test.py -v
+  - coverage run recent2_test.py
   - bash scripts/install_test.sh
 deploy:
   provider: pypi
