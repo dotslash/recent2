@@ -12,7 +12,6 @@ class tests_option:
     _valid_options = set(action.dest for action in recent2.make_arg_parser_for_recent()._actions)
 
     def __init__(self, option):
-        self.option = option
         assert option in tests_option._valid_options
         tests_option.untested_options.discard(option)
 
