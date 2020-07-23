@@ -399,7 +399,7 @@ def query_builder(args, print_help_func):
         else:
             filters.append('json_extract(json_data, "$.env.{}") = ?'.format(split[0]))
             parameters.append(split[1])
-    filters.append('length(command) < {}'.format(args.char_limit))
+    filters.append('length(command) <= {}'.format(args.char_limit))
     try:
         n = int(args.n)
         parameters.append(n)
