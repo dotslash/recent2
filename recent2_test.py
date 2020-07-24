@@ -53,7 +53,7 @@ class RecentTest(unittest.TestCase):
             'help',  # Need not test help
             'debug',  # Will not test debug mode. It add misc log statements.
             # TODO: Add tests for the following options
-            'sql', 're', 'env', 'd', 'columns', 'detail', 'hide_time',
+            'sql', 're', 'd', 'columns', 'detail', 'hide_time',
         }
         assert tests_option.untested_options == untested_options
 
@@ -68,13 +68,16 @@ class RecentTest(unittest.TestCase):
         args = self._arg_parser.parse_args(query.split(" "))
         with mock.patch('sys.stdout', new=io.StringIO()) as fake_out:
             recent2.handle_recent_command(args, self._arg_parser.print_help)
-            return fake_out.getvalue().strip().split("\n")
+            out = fake_out.getvalue().strip()
+            if out == '':
+                return []
+            return out.split("\n")
 
     def check_without_ts(self, result_lines, expected_lines):
         time_template = recent2.Term.WARNING + "2020-07-20 21:52:33 " + recent2.Term.ENDC
         # Strip the time prefix on the results before comparing.
         result_lines = [r[len(time_template):] for r in result_lines]
-        self.assertEqual(result_lines, expected_lines)
+        self.assertEqual(expected_lines, result_lines)
 
     @tests_option("n")
     def test_tail(self):
@@ -189,6 +192,48 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("-w ~/workdir1"), ["workdir1"])
         os.environ["HOME"] = "/home/myuser2"
         self.check_without_ts(self.query("-w ~/workdir2"), ["workdir2"])
+
+    @tests_option("env")
+    def tests_env(self):
+        os.environ['IGNORE'] = 'ignore'
+        # All env vars that start with RECENT_ are captured by default.
+        # The following environment vars are explicitly captured.
+        os.environ['RECENT_ENV_VARS'] = 'EXPLICIT_CAPTURE,EXPLICIT_CAPTURE2'
+        set1 = {'RECENT_CAPTURE': 'implicit1', 'EXPLICIT_CAPTURE': 'explicit1'}
+        set2 = {'RECENT_CAPTURE': 'implicit2', 'EXPLICIT_CAPTURE': 'explicit2'}
+        for s in (set1, set2):
+            for k in s.keys():
+                if k in os.environ:
+                    del os.environ[k]
+
+        self.logCmd("capture_none")
+        os.environ.update(set1)
+        self.logCmd("capture_set1")
+        self.logCmd("capture_set1 again")
+        os.environ.update(set2)
+        self.logCmd("capture_set2")
+        self.logCmd("capture_set2 again")
+
+        # Neither implicitly captured or explicitly captured
+        self.check_without_ts(self.query("--env IGNORE"), [])
+
+        # Query by env var key.
+        self.check_without_ts(self.query("--env RECENT_CAPTURE"),
+                              ["capture_set1", "capture_set1 again",
+                               "capture_set2", "capture_set2 again"])
+        self.check_without_ts(self.query("--env EXPLICIT_CAPTURE"),
+                              ["capture_set1", "capture_set1 again",
+                               "capture_set2", "capture_set2 again"])
+        # Query by env var value.
+        self.check_without_ts(self.query("--env EXPLICIT_CAPTURE:explicit1"),
+                              ["capture_set1", "capture_set1 again"])
+        self.check_without_ts(self.query("--env EXPLICIT_CAPTURE:explicit2"),
+                              ["capture_set2", "capture_set2 again"])
+
+        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit1"),
+                              ["capture_set1", "capture_set1 again"])
+        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit2"),
+                              ["capture_set2", "capture_set2 again"])
 
 
 if __name__ == '__main__':
