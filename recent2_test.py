@@ -50,10 +50,14 @@ class RecentTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         untested_options = {
-            'help',  # Need not test help
-            'debug',  # Will not test debug mode. It add misc log statements.
-            # TODO: Add tests for the following options
-            'sql', 're', 'd', 'columns', 'detail', 'hide_time',
+                               'help',  # Need not test help
+                               'debug',  # Will not test debug mode. It add misc log statements.
+                           # TODO: Add tests for the following options
+                           << << << < HEAD
+        'sql', 're', 'd', 'columns', 'detail', 'hide_time',
+        == == == =
+        'sql', 're', 'env', 'd', 'columns', 'detail', 'hide_time',
+        >> >> >> > origin / master
         }
         assert tests_option.untested_options == untested_options
 

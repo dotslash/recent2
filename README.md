@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.com/dotslash/recent2.svg?branch=master)](https://travis-ci.com/dotslash/recent2)
+[![codecov](https://codecov.io/gh/dotslash/recent2/branch/master/graph/badge.svg)](https://codecov.io/gh/dotslash/recent2)
+[![PyPI version](https://badge.fury.io/py/recent2.svg)](https://badge.fury.io/py/recent2)
 # Recent
 
 Recent is a more structured way to log your bash history.
