@@ -290,6 +290,10 @@ class RecentTest(unittest.TestCase):
                               ["capture_set1", "capture_set1 again"])
         self.check_without_ts(self.query("--env EXPLICIT_CAPTURE:explicit2"),
                               ["capture_set2", "capture_set2 again"])
+        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit1"),
+                              ["capture_set1", "capture_set1 again"])
+        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit2"),
+                              ["capture_set2", "capture_set2 again"])
 
     @tests_option("debug")
     def tests_debug_does_not_throw_error(self):
