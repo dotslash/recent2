@@ -23,7 +23,6 @@ class tests_option:
 
 
 class RecentTest(unittest.TestCase):
-
     def setUp(self) -> None:
         # Use an in-memory shared database for this test.
         # This will automatically be destroyed after the last connection is closed
@@ -52,7 +51,8 @@ class RecentTest(unittest.TestCase):
         untested_options = {
             'help',  # Need not test help
             # TODO: These options change how we display the results. Figure out how to test them.
-            'columns', 'detail'
+            'columns',
+            'detail'
         }
         assert tests_option.untested_options == untested_options
 
@@ -60,8 +60,11 @@ class RecentTest(unittest.TestCase):
         self._sequence += 1
         self._time_secs += 1
         with mock.patch('time.time', return_value=time or self._time_secs):
-            recent2.log_command(command=cmd, pid=self._shell_pid, sequence=self._sequence,
-                                return_value=return_value, pwd=pwd)
+            recent2.log_command(command=cmd,
+                                pid=self._shell_pid,
+                                sequence=self._sequence,
+                                return_value=return_value,
+                                pwd=pwd)
 
     def query(self, query):
         return self.query_with_args(query.split(" "))
@@ -205,16 +208,14 @@ class RecentTest(unittest.TestCase):
         self.logCmd(cmds[1])
         self.check_without_ts(self.query_with_args(["-sql", """command like '%common%'"""]), cmds)
         self.check_without_ts(self.query_with_args(["-sql", """command like 'head%tail'"""]), cmds)
-        self.check_without_ts(self.query_with_args(
-            ["-sql", """command like 'head%tail' AND 
-                        command not like '%1only%'"""]),
-            [cmds[0]]
-        )
-        self.check_without_ts(self.query_with_args(
-            ["-sql", """command like 'head%tail' AND 
-                        command like '%1only%'"""]),
-            [cmds[1]]
-        )
+        self.check_without_ts(
+            self.query_with_args(
+                ["-sql", ("""command like 'head%tail' """
+                          """AND command not like '%1only%'""")]), [cmds[0]])
+        self.check_without_ts(
+            self.query_with_args(
+                ["-sql", ("""command like 'head%tail' """
+                          """AND command like '%1only%'""")]), [cmds[1]])
 
     @tests_option("w")
     def test_workdir(self):
@@ -250,7 +251,8 @@ class RecentTest(unittest.TestCase):
         self.logCmd("cmd 2020-07-01", time=ts_for_date("2020-07-01"))
         self.logCmd("cmd 2020-07-02", time=ts_for_date("2020-07-02"))
 
-        self.check_without_ts(self.query("-d 2020"), ["cmd 2020-06-01", "cmd 2020-07-01", "cmd 2020-07-02"])
+        self.check_without_ts(self.query("-d 2020"),
+                              ["cmd 2020-06-01", "cmd 2020-07-01", "cmd 2020-07-02"])
         self.check_without_ts(self.query("-d 2020-07"), ["cmd 2020-07-01", "cmd 2020-07-02"])
         self.check_without_ts(self.query("-d 2020-07-01"), ["cmd 2020-07-01"])
 
@@ -279,12 +281,12 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("--env IGNORE"), [])
 
         # Query by env var key.
-        self.check_without_ts(self.query("--env RECENT_CAPTURE"),
-                              ["capture_set1", "capture_set1 again",
-                               "capture_set2", "capture_set2 again"])
-        self.check_without_ts(self.query("--env EXPLICIT_CAPTURE"),
-                              ["capture_set1", "capture_set1 again",
-                               "capture_set2", "capture_set2 again"])
+        self.check_without_ts(
+            self.query("--env RECENT_CAPTURE"),
+            ["capture_set1", "capture_set1 again", "capture_set2", "capture_set2 again"])
+        self.check_without_ts(
+            self.query("--env EXPLICIT_CAPTURE"),
+            ["capture_set1", "capture_set1 again", "capture_set2", "capture_set2 again"])
         # Query by env var value.
         self.check_without_ts(self.query("--env EXPLICIT_CAPTURE:explicit1"),
                               ["capture_set1", "capture_set1 again"])
