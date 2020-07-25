@@ -29,8 +29,8 @@ class DB:
     SCHEMA_VERSION = 2
     CASE_ON = "PRAGMA case_sensitive_like = true"
     GET_COMMANDS_TABLE_SCHEMA = """
-        select sql 
-        from sqlite_master 
+        select sql
+        from sqlite_master
         where type = 'table' and name = 'commands'"""
     # NOTE(dotslash): I haven't found a way to send json using ?s. So doing with string formats.
     INSERT_ROW = """
@@ -58,7 +58,7 @@ class DB:
                 null -- json_data
             )"""
     INSERT_SESSION = """
-        insert into sessions 
+        insert into sessions
             (created_dt, updated_dt, term, hostname, user, sequence, session)
             values (
                 datetime('now','localtime'), datetime('now','localtime'), -- created_dt, updated_dt
@@ -69,7 +69,7 @@ class DB:
                 ?  -- session
             )"""
     UPDATE_SESSION = """
-        update sessions 
+        update sessions
         set updated_dt = datetime('now','localtime'), sequence = ?
         where session = ?"""
     # TAIL_N_ROWS's columns (column order is same as TAIL_N_ROWS
@@ -77,8 +77,8 @@ class DB:
     TAIL_N_ROWS_TEMPLATE = """
         select command_dt,command,pid,return_val,pwd,session,json_data
         from (
-            select * 
-            from commands 
+            select *
+            from commands
             where
             order by command_dt desc limit ?
         )
@@ -98,7 +98,7 @@ class DB:
         )"""
     CREATE_SESSIONS_TABLE = """
         create table if not exists sessions (
-            session text primary key not null, 
+            session text primary key not null,
             created_dt timestamp,
             updated_dt timestamp,
             term text,
@@ -107,7 +107,7 @@ class DB:
             sequence int
         )"""
     CREATE_DATE_INDEX = """
-        create index if not exists command_dt_ind 
+        create index if not exists command_dt_ind
             on commands (command_dt)"""
     # Schema version
     GET_SCHEMA_VERSION = """pragma user_version"""
@@ -117,7 +117,6 @@ class DB:
 
 
 class Session:
-
     def __init__(self, pid, sequence):
         self.sequence = sequence
         self.empty = False
@@ -134,7 +133,8 @@ class Session:
             os.getenv('TMUX', ''),
             os.getenv('TMUX_PANE', ''),
             os.getenv('STY', ''),
-            pid)
+            pid,
+        )  # yapf: disable
         self.id = hashlib.md5(seed.encode('utf-8')).hexdigest()
 
     def update(self, conn):
@@ -143,8 +143,7 @@ class Session:
             term = os.getenv('TERM', '')
             hostname = socket.gethostname()
             user = os.getenv('USER', '')
-            c.execute(DB.INSERT_SESSION,
-                      [term, hostname, user, self.sequence, self.id])
+            c.execute(DB.INSERT_SESSION, [term, hostname, user, self.sequence, self.id])
             self.empty = True
         except sqlite3.IntegrityError:
             # Carriage returns need to be ignored
@@ -163,8 +162,7 @@ def migrate(cur_version, conn):
     c = conn.cursor()
     if cur_version == 1:
         # Schema version is v1. Migrate to v2.
-        print(Term.WARNING +
-              'recent: migrating schema to version {}'.format(DB.SCHEMA_VERSION) +
+        print(Term.WARNING + 'recent: migrating schema to version {}'.format(DB.SCHEMA_VERSION) +
               Term.ENDC)
         c.execute(DB.MIGRATE_1_2)
     else:
@@ -178,8 +176,7 @@ def migrate(cur_version, conn):
 
 
 def parse_history(history):
-    match = re.search(r'^\s*(\d+)\s+(.*)$', history,
-                      re.MULTILINE and re.DOTALL)
+    match = re.search(r'^\s*(\d+)\s+(.*)$', history, re.MULTILINE and re.DOTALL)
     if match:
         return match.group(1), match.group(2)
     else:
@@ -235,8 +232,7 @@ def envvars_to_log():
 def log():
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--return_value', help='Command return value. Set to $?', default=0)
-    parser.add_argument('-c', '--command',
-                        help='Set to $(HISTTIMEFORMAT= history 1)', default='')
+    parser.add_argument('-c', '--command', help='Set to $(HISTTIMEFORMAT= history 1)', default='')
     parser.add_argument('-p', '--pid', help='Shell pid. Set to $$', default=0)
     args = parser.parse_args()
 
@@ -245,10 +241,8 @@ def log():
     pwd = os.getenv('PWD', '')
 
     if not sequence or not command:
-        print(Term.WARNING +
-              ('recent: cannot parse command output, please check your bash '
-               'trigger looks like this:') +
-              Term.ENDC)
+        print(Term.WARNING + ('recent: cannot parse command output, please check your bash '
+                              'trigger looks like this:') + Term.ENDC)
         print("""export PROMPT_COMMAND="""
               """'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
         exit(1)
@@ -264,7 +258,8 @@ def log_command(command, pid, sequence, return_value, pwd):
         c = conn.cursor()
         json_data = "json('{}')".format(json.dumps({'env': envvars_to_log()}))
         # We pass current time instead of using 'now' in sql to mock this value.
-        c.execute(DB.INSERT_ROW.format(json_data), [int(time.time()), command, pid, return_value, pwd, session.id])
+        c.execute(DB.INSERT_ROW.format(json_data),
+                  [int(time.time()), command, pid, return_value, pwd, session.id])
 
     conn.commit()
     conn.close()
@@ -343,7 +338,7 @@ def import_bash_history():
         c.execute(DB.INSERT_ROW_NO_JSON, [
             cmd_ts, cmd, pid,
             # exit status=-1, working directory=/unknown
-            -1, "/unknown", session.id])
+            -1, "/unknown", session.id])  # yapf: disable
     conn.commit()
     conn.close()
 
@@ -358,10 +353,8 @@ def query_builder(args, print_help_func):
     num_status_filter = sum(
         1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
     if num_status_filter > 1:
-        print(Term.FAIL +
-              ('Only one of --successes_only, --failures_only and '
-               '--status_num has to be set') +
-              Term.ENDC)
+        print(Term.FAIL + ('Only one of --successes_only, --failures_only and '
+                           '--status_num has to be set') + Term.ENDC)
         print_help_func()
         exit(1)
     query = DB.TAIL_N_ROWS_TEMPLATE
@@ -426,52 +419,55 @@ def make_arg_parser_for_recent():
     description = ('recent is a convenient way to query bash history. '
                    'Visit {} for more examples or to ask questions or to report issues'
                    ).format(Term.UNDERLINE + 'https://github.com/dotslash/recent2' + Term.ENDC)
-    epilog = 'To import bash history into recent db run {}'.format(
-        Term.UNDERLINE + 'recent-import-bash-history' + Term.ENDC)
+    epilog = 'To import bash history into recent db run {}'.format(Term.UNDERLINE +
+                                                                   'recent-import-bash-history' +
+                                                                   Term.ENDC)
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
-    parser.add_argument(
-        'pattern', nargs='?',
-        default='', help='optional pattern to search')
-    parser.add_argument('-n', metavar='20',
-                        help='max results to return', default=20)
+    parser.add_argument('pattern', nargs='?', default='', help='optional pattern to search')
+    parser.add_argument('-n', metavar='20', help='max results to return', default=20)
 
     # Filters for command success/failure.
-    parser.add_argument('--status_num', '-stn', metavar='0',
+    parser.add_argument('--status_num',
+                        '-stn',
+                        metavar='0',
                         help='int exit status of the commands to return. -1 => return all.',
                         default=-1)
-    parser.add_argument('--successes_only', '-so',
+    parser.add_argument('--successes_only',
+                        '-so',
                         help='only return commands that exited with success',
                         action='store_true')
-    parser.add_argument('--failures_only', '-fo',
+    parser.add_argument('--failures_only',
+                        '-fo',
                         help='only return commands that exited with failure',
                         action='store_true')
     # Other filters/options.
-    parser.add_argument('-w', metavar='/folder',
-                        help='working directory', default='')
-    parser.add_argument(
-        '-d', metavar='2016-10-01',
-        help='date in YYYY-MM-DD, YYYY-MM, or YYYY format', default='')
-    parser.add_argument(
-        '--return_self',
-        help='Return `recent` commands also in the output',
-        action='store_true')
-    parser.add_argument(
-        '--char_limit', '-cl',
-        metavar='200',
-        help='Ignore commands longer than this.',
-        default=200)
-    parser.add_argument(
-        '-e', '--env',
-        action='append',
-        help='Filter by shell env vars. Env vars set in RECENT_ENV_VARS as comma separated list will be captured.',
-        metavar='key[:val]',
-        default=[])
+    parser.add_argument('-w', metavar='/folder', help='working directory', default='')
+    parser.add_argument('-d',
+                        metavar='2016-10-01',
+                        help='date in YYYY-MM-DD, YYYY-MM, or YYYY format',
+                        default='')
+    parser.add_argument('--return_self',
+                        help='Return `recent` commands also in the output',
+                        action='store_true')
+    parser.add_argument('--char_limit',
+                        '-cl',
+                        metavar='200',
+                        help='Ignore commands longer than this.',
+                        default=200)
+    parser.add_argument('-e',
+                        '--env',
+                        action='append',
+                        help=('Filter by shell env vars. Env vars set in RECENT_ENV_VARS '
+                              'as comma separated list will be captured.'),
+                        metavar='key[:val]',
+                        default=[])
 
     # CONTROL OUTPUT FORMAT
     # Hide time. This makes copy-pasting simpler.
-    parser.add_argument(
-        '--hide_time', '-ht',
-        help='dont display time in command output', action='store_true')
+    parser.add_argument('--hide_time',
+                        '-ht',
+                        help='dont display time in command output',
+                        action='store_true')
     parser.add_argument('--debug', help='Debug mode', action='store_true')
     parser.add_argument('--detail', help='Return detailed output', action='store_true')
     parser.add_argument(
@@ -481,13 +477,12 @@ def make_arg_parser_for_recent():
         default="command_dt,command,json_data")
 
     # Query type - regex/sql.
-    parser.add_argument(
-        '-re', help='enable regex search pattern', action='store_true')
-    parser.add_argument(
-        '-sql', help='enable sqlite search pattern', action='store_true')
-    parser.add_argument(
-        '--nocase', '-nc',
-        help='Ignore case when searching for patterns', action='store_true')
+    parser.add_argument('-re', help='enable regex search pattern', action='store_true')
+    parser.add_argument('-sql', help='enable sqlite search pattern', action='store_true')
+    parser.add_argument('--nocase',
+                        '-nc',
+                        help='Ignore case when searching for patterns',
+                        action='store_true')
     return parser
 
 
@@ -500,10 +495,8 @@ def check_prompt(debug):
     export_prompt_cmd = \
         '''export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$' '''
     if EXPECTED_PROMPT not in actual_prompt:
-        print(Term.BOLD +
-              "PROMPT_COMMAND env variable is not set. " +
-              "Add the following line to .bashrc or .bash_profile" +
-              Term.ENDC)
+        print(Term.BOLD + "PROMPT_COMMAND env variable is not set. " +
+              "Add the following line to .bashrc or .bash_profile" + Term.ENDC)
 
         print(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
         exit(1)
@@ -530,9 +523,11 @@ def handle_recent_command(args, print_help_func):
     columns_to_print.extend(['command_dt', 'command'])
     for query, parameters in query_builder(args, print_help_func):
         for row in c.execute(query, parameters):
-            row_dict = {DB.TAIL_N_ROWS_COLUMNS[i]: row[i]
-                        for i in range(len(row))
-                        if DB.TAIL_N_ROWS_COLUMNS[i] in columns_to_print}
+            row_dict = {
+                DB.TAIL_N_ROWS_COLUMNS[i]: row[i]
+                for i in range(len(row))
+                if DB.TAIL_N_ROWS_COLUMNS[i] in columns_to_print
+            }
             if 'command_dt' not in row_dict or 'command' not in row_dict:
                 # Why would we have these entries?
                 continue

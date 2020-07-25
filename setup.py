@@ -24,7 +24,7 @@ setup(
         'Topic :: System :: Shells',
         'Topic :: Utilities',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3 :: Only'
+        'Programming Language :: Python :: 3 :: Only',
     ],
     keywords='logging bash history database sqlite',
     py_modules=["recent2"],
@@ -37,6 +37,6 @@ setup(
     },
     python_requires='>=3',
     install_requires=[
-        'tabulate'
-    ]
+        'tabulate',
+    ],
 )

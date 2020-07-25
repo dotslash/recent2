@@ -4,11 +4,14 @@ python:
 install:
   - pip install tabulate # dependency.
   - pip install codecov # code coverage.
+  - pip install flake8
 script:
   # testing + coverage.
   - coverage run recent2_test.py
   # Basic e2e tests.
   - bash scripts/install_test.sh
+before_script:
+  flake8 .
 deploy:
   provider: pypi
   user: __token__
