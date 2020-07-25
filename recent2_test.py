@@ -51,21 +51,23 @@ class RecentTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         untested_options = {
             'help',  # Need not test help
-            'debug',  # Will not test debug mode. It add misc log statements.
-            # TODO: Add tests for the following options
-            'sql', 're', 'd', 'columns', 'detail', 'hide_time'
+            # TODO: These options change how we display the results. Figure out how to test them.
+            'columns', 'detail'
         }
         assert tests_option.untested_options == untested_options
 
-    def logCmd(self, cmd, return_value=0, pwd="/root"):
+    def logCmd(self, cmd, return_value=0, pwd="/root", time=None):
         self._sequence += 1
         self._time_secs += 1
-        with mock.patch('time.time', return_value=self._time_secs):
+        with mock.patch('time.time', return_value=time or self._time_secs):
             recent2.log_command(command=cmd, pid=self._shell_pid, sequence=self._sequence,
                                 return_value=return_value, pwd=pwd)
 
     def query(self, query):
-        args = self._arg_parser.parse_args(query.split(" "))
+        return self.query_with_args(query.split(" "))
+
+    def query_with_args(self, args):
+        args = self._arg_parser.parse_args(args)
         with mock.patch('sys.stdout', new=io.StringIO()) as fake_out:
             recent2.handle_recent_command(args, self._arg_parser.print_help)
             out = fake_out.getvalue().strip()
@@ -90,6 +92,14 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("-n 25"), commands[-25:])
         # We have only 30 items logged
         self.check_without_ts(self.query("-n 100"), commands)
+
+    @tests_option("hide_time")
+    def test_hide_time(self):
+        self.logCmd("cmd1")
+        self.logCmd("cmd2")
+        # Time will not be printed, we can check the raw lines directly
+        self.assertEqual(["cmd1", "cmd2"], self.query("--hide_time"))
+        self.assertEqual(["cmd1", "cmd2"], self.query("-ht"))
 
     def test_tail_duplicate(self):
         # Runs test tail again. This will make sure that we are creating & cleaning up properly
@@ -172,6 +182,40 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("head%0only%tail"), [cmds[0]])
         self.check_without_ts(self.query("head%1only%tail"), [cmds[1]])
 
+    @tests_option("re")
+    def test_re(self):
+        cmds = [
+            "head common 0only tail",
+            "head 1only common tail",
+        ]
+        self.logCmd(cmds[0])
+        self.logCmd(cmds[1])
+        self.check_without_ts(self.query("-re common"), cmds)
+        self.check_without_ts(self.query("-re head.*tail"), cmds)
+        self.check_without_ts(self.query("-re head.*0.*tail"), [cmds[0]])
+        self.check_without_ts(self.query("-re head.*1.*tail"), [cmds[1]])
+
+    @tests_option("sql")
+    def test_sql(self):
+        cmds = [
+            "head common 0only tail",
+            "head 1only common tail",
+        ]
+        self.logCmd(cmds[0])
+        self.logCmd(cmds[1])
+        self.check_without_ts(self.query_with_args(["-sql", """command like '%common%'"""]), cmds)
+        self.check_without_ts(self.query_with_args(["-sql", """command like 'head%tail'"""]), cmds)
+        self.check_without_ts(self.query_with_args(
+            ["-sql", """command like 'head%tail' AND 
+                        command not like '%1only%'"""]),
+            [cmds[0]]
+        )
+        self.check_without_ts(self.query_with_args(
+            ["-sql", """command like 'head%tail' AND 
+                        command like '%1only%'"""]),
+            [cmds[1]]
+        )
+
     @tests_option("w")
     def test_workdir(self):
         self.logCmd("workdir1", pwd="/home/myuser1/workdir1")
@@ -192,6 +236,23 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("-w ~/workdir1"), ["workdir1"])
         os.environ["HOME"] = "/home/myuser2"
         self.check_without_ts(self.query("-w ~/workdir2"), ["workdir2"])
+
+    @tests_option("d")
+    def test_date(self):
+        def ts_for_date(date_str):
+            yr, m, day = map(int, date_str.split("-"))
+            import datetime
+            # 12 pm on the given day
+            return datetime.datetime(yr, m, day, hour=12).timestamp()
+
+        self.logCmd("cmd 2019-07-01", time=ts_for_date("2019-07-01"))
+        self.logCmd("cmd 2020-06-01", time=ts_for_date("2020-06-01"))
+        self.logCmd("cmd 2020-07-01", time=ts_for_date("2020-07-01"))
+        self.logCmd("cmd 2020-07-02", time=ts_for_date("2020-07-02"))
+
+        self.check_without_ts(self.query("-d 2020"), ["cmd 2020-06-01", "cmd 2020-07-01", "cmd 2020-07-02"])
+        self.check_without_ts(self.query("-d 2020-07"), ["cmd 2020-07-01", "cmd 2020-07-02"])
+        self.check_without_ts(self.query("-d 2020-07-01"), ["cmd 2020-07-01"])
 
     @tests_option("env")
     def tests_env(self):
@@ -230,10 +291,18 @@ class RecentTest(unittest.TestCase):
         self.check_without_ts(self.query("--env EXPLICIT_CAPTURE:explicit2"),
                               ["capture_set2", "capture_set2 again"])
 
-        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit1"),
-                              ["capture_set1", "capture_set1 again"])
-        self.check_without_ts(self.query("--env RECENT_CAPTURE:implicit2"),
-                              ["capture_set2", "capture_set2 again"])
+    @tests_option("debug")
+    def tests_debug_does_not_throw_error(self):
+        self.logCmd("cmd1")
+        self.logCmd("cmd2")
+        res = self.query("--debug")
+        cmd1_found, cmd2_found = False, False
+        for r in res:
+            if "cmd1" in r:
+                cmd1_found = True
+            elif "cmd2" in r:
+                cmd2_found = True
+        self.assertTrue(cmd1_found and cmd2_found)
 
 
 if __name__ == '__main__':
