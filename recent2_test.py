@@ -416,8 +416,8 @@ class ImportBashHistory(TestBase):
         # Check that we actually imported history
         # Note:
         # - we are not testing timestamps.
-        # - we are checking for cmd3 before cmd2 because cmd3 will get cmd2's timestamp and sqlite returns latest
-        #   inserted item first.
+        # - we are checking for cmd3 before cmd2 because cmd3 will get cmd2's timestamp and
+        #   sqlite returns latest inserted item first.
         self.check_without_ts(self.query(""), ["cmd1", "cmd3", "cmd2", "cmd4"])
         #
         self.assertTrue(Path(self.import_marker).exists())
