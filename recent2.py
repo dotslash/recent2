@@ -1,14 +1,15 @@
 #!/usr/bin/env python
-import json
-import sqlite3
-import os
 import argparse
 import hashlib
+import json
+import os
 import re
 import socket
+import sqlite3
 import sys
 import time
-from pathlib import PurePath, Path
+from pathlib import Path
+
 from tabulate import tabulate
 
 
@@ -225,7 +226,7 @@ def envvars_to_log():
         for interesting_var in envvar_whitelist:
             # if name matches glob(interesting_var) then we will store it.
             # E.g - CONDA_* => we are interested in all env vars that start with CONDA_.
-            if PurePath(name).match(interesting_var):
+            if Path(name).match(interesting_var):
                 return True
         return False
 
@@ -281,17 +282,18 @@ def import_bash_history_entry_point(args_for_test=None):
                         help='Force import bash history ignoring previous imports',
                         action='store_true')
     args = parser.parse_args(args_for_test)
-    import_file = os.path.expanduser(
+    import_marker = Path(
         os.environ.get("RECENT_TEST_IMPORT_FILE", "~/.recent_imported_bash_history"))
-    print(import_file)
-    if not args.f and os.path.exists(import_file):
+    import_marker = import_marker.expanduser().absolute()
+    print(import_marker)
+    if not args.f and import_marker.exists():
         print(Term.FAIL +
               'recent-import-bash-history failed: Bash history already imported into ~/.recent.db')
         print('Run the command with -f option if you are absolutely sure.' + Term.ENDC)
         parser.print_help()
         sys.exit(1)
     import_bash_history()
-    open(import_file, 'a').close()
+    import_marker.touch()
 
 
 def import_bash_history():
@@ -391,7 +393,7 @@ def query_builder(args, failure_exit_func):
             parameters.append('%' + args.pattern + '%')
     if args.w:
         filters.append('pwd = ?')
-        parameters.append(os.path.abspath(os.path.expanduser(args.w)))
+        parameters.append(str(Path(args.w).expanduser().absolute()))
     if args.d:
         filters.append(parse_date(args.d))
         parameters.append(args.d)
