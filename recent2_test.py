@@ -48,11 +48,6 @@ class TestBase(unittest.TestCase):
     def tearDown(self) -> None:
         self._keep_alive_conn.close()
 
-    def getAndIncrementTime(self):
-        ret = self._time_secs
-        self._time_secs += 1
-        return ret
-
     def query(self, query):
         return self.query_with_args(query.split(" "))
 
@@ -401,18 +396,30 @@ class ImportBashHistory(TestBase):
 
     def helper_for_test_import(self, import_args=None):
         def time_history_line():
-            return "#{}".format(int(self.getAndIncrementTime()))
+            now = self._time_secs
+            self._time_secs += 1
+            return "#{}".format(int(now))
 
         lines = [
             time_history_line(),
             "cmd1",
             time_history_line(),
             "cmd2",
+            "cmd3",  # This command has no timestamp.
+            time_history_line(),
+            "cmd4",  # This command has timestamp again.
         ]
         content = "\n".join(lines)
         Path(self.history_file).write_text(content)
+        # Import history
         self.import_history(args=import_args)
-        self.check_without_ts(self.query(""), ["cmd1", "cmd2"])
+        # Check that we actually imported history
+        # Note:
+        # - we are not testing timestamps.
+        # - we are checking for cmd3 before cmd2 because cmd3 will get cmd2's timestamp and sqlite returns latest
+        #   inserted item first.
+        self.check_without_ts(self.query(""), ["cmd1", "cmd3", "cmd2", "cmd4"])
+        #
         self.assertTrue(Path(self.import_marker).exists())
 
     def test_import(self):
