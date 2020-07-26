@@ -284,6 +284,7 @@ def import_bash_history_entry_point(args_for_test=None):
     args = parser.parse_args(args_for_test)
     import_marker = Path(
         os.environ.get("RECENT_TEST_IMPORT_FILE", "~/.recent_imported_bash_history"))
+    import_marker = import_marker.expanduser().absolute()
     print(import_marker)
     if not args.f and import_marker.exists():
         print(Term.FAIL +
