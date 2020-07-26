@@ -3,6 +3,8 @@ import os
 import time
 import unittest
 import unittest.mock as mock
+import uuid
+from pathlib import Path
 
 import recent2
 
@@ -22,7 +24,7 @@ class tests_option:
         return wrapped_f
 
 
-class RecentTest(unittest.TestCase):
+class TestBase(unittest.TestCase):
     def setUp(self) -> None:
         # Use an in-memory shared database for this test.
         # This will automatically be destroyed after the last connection is closed
@@ -46,6 +48,31 @@ class RecentTest(unittest.TestCase):
     def tearDown(self) -> None:
         self._keep_alive_conn.close()
 
+    def getAndIncrementTime(self):
+        ret = self._time_secs
+        self._time_secs += 1
+        return ret
+
+    def query(self, query):
+        return self.query_with_args(query.split(" "))
+
+    def query_with_args(self, args):
+        args = self._arg_parser.parse_args(args)
+        with mock.patch('sys.stdout', new=io.StringIO()) as fake_out:
+            recent2.handle_recent_command(args, self._arg_parser.exit)
+            out = fake_out.getvalue().strip()
+            if out == '':
+                return []
+            return out.split("\n")
+
+    def check_without_ts(self, result_lines, expected_lines):
+        time_template = recent2.Term.WARNING + "2020-07-20 21:52:33 " + recent2.Term.ENDC
+        # Strip the time prefix on the results before comparing.
+        result_lines = [r[len(time_template):] for r in result_lines]
+        self.assertEqual(expected_lines, result_lines)
+
+
+class RecentTest(TestBase):
     @classmethod
     def tearDownClass(cls) -> None:
         untested_options = {
@@ -65,24 +92,6 @@ class RecentTest(unittest.TestCase):
                                 sequence=self._sequence,
                                 return_value=return_value,
                                 pwd=pwd)
-
-    def query(self, query):
-        return self.query_with_args(query.split(" "))
-
-    def query_with_args(self, args):
-        args = self._arg_parser.parse_args(args)
-        with mock.patch('sys.stdout', new=io.StringIO()) as fake_out:
-            recent2.handle_recent_command(args, self._arg_parser.print_help)
-            out = fake_out.getvalue().strip()
-            if out == '':
-                return []
-            return out.split("\n")
-
-    def check_without_ts(self, result_lines, expected_lines):
-        time_template = recent2.Term.WARNING + "2020-07-20 21:52:33 " + recent2.Term.ENDC
-        # Strip the time prefix on the results before comparing.
-        result_lines = [r[len(time_template):] for r in result_lines]
-        self.assertEqual(expected_lines, result_lines)
 
     @tests_option("n")
     def test_tail(self):
@@ -309,6 +318,119 @@ class RecentTest(unittest.TestCase):
             elif "cmd2" in r:
                 cmd2_found = True
         self.assertTrue(cmd1_found and cmd2_found)
+
+    def test_recent_custom_prompt(self):
+        # If you set RECENT_CUSTOM_PROMPT, PROMPT_COMMAND check will be skipped.
+        os.environ['RECENT_CUSTOM_PROMPT'] = 'something'
+        os.environ['PROMPT_COMMAND'] = 'something'
+        with mock.patch('sys.exit') as exit_mock:
+            recent2.check_prompt(False)
+            self.assertFalse(exit_mock.called)
+
+        del os.environ['PROMPT_COMMAND']
+        with mock.patch('sys.exit') as exit_mock:
+            recent2.check_prompt(False)
+            self.assertFalse(exit_mock.called)
+
+    def test_check_prompt(self):
+        # PROMPT_COMMAND will be checked.
+        os.environ['PROMPT_COMMAND'] = recent2.EXPECTED_PROMPT
+        with mock.patch('sys.exit') as exit_mock:
+            recent2.check_prompt(False)
+            self.assertFalse(exit_mock.called)
+
+        os.environ['PROMPT_COMMAND'] = 'something'
+        with mock.patch('sys.exit') as exit_mock:
+            recent2.check_prompt(False)
+            self.assertTrue(exit_mock.called)
+            # First argument in first call to exit_mock
+            exit_arg = exit_mock.call_args[0][0]
+            self.assertTrue('PROMPT_COMMAND' in exit_arg and recent2.EXPECTED_PROMPT in exit_arg)
+
+        del os.environ['PROMPT_COMMAND']
+        with mock.patch('sys.exit') as exit_mock:
+            recent2.check_prompt(False)
+            self.assertTrue(exit_mock.called)
+            # First argument in first call to exit_mock
+            exit_arg = exit_mock.call_args[0][0]
+            self.assertTrue('PROMPT_COMMAND' in exit_arg and recent2.EXPECTED_PROMPT in exit_arg)
+
+
+class LogCommandTest(TestBase):
+    # log() method will not be tested here because we have enough coverage in RecentTest
+
+    def test_log_entry_point(self):
+        os.environ['PWD'] = '/cur_pwd'
+        with mock.patch('recent2.log_command') as log_command:
+            recent2.log(["-r", "12", "-c", "123 my_cmd", "-p", "1234"])
+            log_command.assert_called_with(command="my_cmd",
+                                           pid=1234,
+                                           sequence=123,
+                                           return_value=12,
+                                           pwd="/cur_pwd")
+
+    def test_parse_history(self):
+        cmd = "cmd arg1 arg2 arg3"
+        self.assertEqual(recent2.parse_history("1234 " + cmd), (1234, cmd))
+        self.assertEqual(recent2.parse_history(" 123   " + cmd), (123, cmd))
+        self.assertEqual(recent2.parse_history(" 12  " + cmd), (12, cmd))
+        self.assertEqual(recent2.parse_history("no_number " + cmd), (None, None))
+
+
+class ImportBashHistory(TestBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.import_marker = "/tmp/{}".format(uuid.uuid1())
+        self.history_file = "/tmp/{}".format(uuid.uuid1())
+        os.environ['RECENT_TEST_IMPORT_FILE'] = self.import_marker
+        os.environ['HISTFILE'] = self.history_file
+
+    # Calls import_bash_history_entry_point and returns stdout.
+    def import_history(self, expect_failure=False, args=None):
+        def work():
+            if expect_failure:
+                with self.assertRaises(SystemExit) as cm:
+                    return recent2.import_bash_history_entry_point(args)
+                self.assertNotEqual(cm.exception.code, 0)
+            else:
+                return recent2.import_bash_history_entry_point(args)
+
+        with mock.patch('sys.stdout', new=io.StringIO()) as fake_out:
+            work()
+        return fake_out.getvalue()
+
+    def helper_for_test_import(self, import_args=None):
+        def time_history_line():
+            return "#{}".format(int(self.getAndIncrementTime()))
+
+        lines = [
+            time_history_line(),
+            "cmd1",
+            time_history_line(),
+            "cmd2",
+        ]
+        content = "\n".join(lines)
+        Path(self.history_file).write_text(content)
+        self.import_history(args=import_args)
+        self.check_without_ts(self.query(""), ["cmd1", "cmd2"])
+        self.assertTrue(Path(self.import_marker).exists())
+
+    def test_import(self):
+        # Expected case.
+        self.helper_for_test_import()
+
+    def test_import_force(self):
+        # Import marker exists, but we will run with -f argument to import
+        # again.
+        Path(self.import_marker).touch()
+        self.helper_for_test_import(["-f"])
+
+    def test_import_marker_exists(self):
+        # Import marker exists. So import will fail.
+        Path(self.import_marker).touch()
+        # Import marker exists => failure
+        stdout = self.import_history(expect_failure=True)
+        self.assertTrue('Bash history already imported' in stdout)
 
 
 if __name__ == '__main__':
