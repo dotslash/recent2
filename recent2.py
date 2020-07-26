@@ -6,8 +6,9 @@ import argparse
 import hashlib
 import re
 import socket
+import sys
 import time
-from pathlib import PurePath
+from pathlib import PurePath, Path
 from tabulate import tabulate
 
 
@@ -175,10 +176,13 @@ def migrate(cur_version, conn):
     conn.commit()
 
 
+# Parses history command.
+# This parse the output of `HISTTIMEFORMAT= history 1`
+# Format: optional_whitespace + required_sequence_number + required_whitespace + command
 def parse_history(history):
     match = re.search(r'^\s*(\d+)\s+(.*)$', history, re.MULTILINE and re.DOTALL)
     if match:
-        return match.group(1), match.group(2)
+        return int(match.group(1)), match.group(2)
     else:
         return None, None
 
@@ -229,12 +233,16 @@ def envvars_to_log():
 
 
 # Entry point to recent-log command.
-def log():
+def log(args_for_test=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('-r', '--return_value', help='Command return value. Set to $?', default=0)
+    parser.add_argument('-r',
+                        '--return_value',
+                        help='Command return value. Set to $?',
+                        default=0,
+                        type=int)
     parser.add_argument('-c', '--command', help='Set to $(HISTTIMEFORMAT= history 1)', default='')
-    parser.add_argument('-p', '--pid', help='Shell pid. Set to $$', default=0)
-    args = parser.parse_args()
+    parser.add_argument('-p', '--pid', help='Shell pid. Set to $$', default=0, type=int)
+    args = parser.parse_args(args_for_test)
 
     sequence, command = parse_history(args.command)
     pid, return_value = args.pid, args.return_value
@@ -243,9 +251,7 @@ def log():
     if not sequence or not command:
         print(Term.WARNING + ('recent: cannot parse command output, please check your bash '
                               'trigger looks like this:') + Term.ENDC)
-        print("""export PROMPT_COMMAND="""
-              """'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'""")
-        exit(1)
+        exit("""export PROMPT_COMMAND='{}'""".format(EXPECTED_PROMPT))
     log_command(command=command, pid=pid, sequence=sequence, return_value=return_value, pwd=pwd)
 
 
@@ -267,21 +273,23 @@ def log_command(command, pid, sequence, return_value, pwd):
 
 # Imports bash_history into RECENT_DB
 # Entry point to recent-import-bash-history command.
-def import_bash_history_entry_point():
+def import_bash_history_entry_point(args_for_test=None):
     description = ('recent-import-bash-history imports bash_history into ~/.recent.db. '
                    'Run `recent -h` for info about recent command.')
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-f',
                         help='Force import bash history ignoring previous imports',
                         action='store_true')
-    args = parser.parse_args()
-    import_file = os.path.expanduser("~/.recent_imported_bash_history")
+    args = parser.parse_args(args_for_test)
+    import_file = os.path.expanduser(
+        os.environ.get("RECENT_TEST_IMPORT_FILE", "~/.recent_imported_bash_history"))
+    print(import_file)
     if not args.f and os.path.exists(import_file):
         print(Term.FAIL +
               'recent-import-bash-history failed: Bash history already imported into ~/.recent.db')
         print('Run the command with -f option if you are absolutely sure.' + Term.ENDC)
         parser.print_help()
-        exit(1)
+        sys.exit(1)
     import_bash_history()
     open(import_file, 'a').close()
 
@@ -305,8 +313,12 @@ def import_bash_history():
     #  (1571012545, "echo foo"),
     #  (1571012560, "cat bar")]
     last_ts = -1
-    histfile = os.environ.get("HISTFILE", "~/.bash_history")
-    for line in open(os.path.expanduser(histfile)):
+    histfile = Path(os.environ.get("HISTFILE", "~/.bash_history")).expanduser()
+    if not histfile.exists():
+        return
+    for line in histfile.read_text().splitlines():
+        if not line:
+            continue
         if line[0] == '#':
             try:
                 last_ts = int(line[1:].strip())
@@ -345,18 +357,16 @@ def import_bash_history():
 
 # Returns a list of queries to run for the given args
 # Return type: List(Pair(query, List(query_string)))
-def query_builder(args, print_help_func):
+def query_builder(args, failure_exit_func):
     if args.re and args.sql:
         print(Term.FAIL + 'Only one of -re and -sql should be set' + Term.ENDC)
-        print_help_func()
-        exit(1)
+        failure_exit_func(1)
     num_status_filter = sum(
         1 for x in [args.successes_only, args.failures_only, args.status_num != -1] if x)
     if num_status_filter > 1:
         print(Term.FAIL + ('Only one of --successes_only, --failures_only and '
                            '--status_num has to be set') + Term.ENDC)
-        print_help_func()
-        exit(1)
+        failure_exit_func(1)
     query = DB.TAIL_N_ROWS_TEMPLATE
     filters = []
     parameters = []
@@ -492,17 +502,14 @@ def check_prompt(debug):
             print("RECENT_CUSTOM_PROMPT is set. Not checking prompt")
         return
     actual_prompt = os.environ.get('PROMPT_COMMAND', '')
-    export_prompt_cmd = \
-        '''export PROMPT_COMMAND='log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$' '''
+    export_prompt_cmd = '''export PROMPT_COMMAND='{}' '''.format(EXPECTED_PROMPT)
     if EXPECTED_PROMPT not in actual_prompt:
         print(Term.BOLD + "PROMPT_COMMAND env variable is not set. " +
               "Add the following line to .bashrc or .bash_profile" + Term.ENDC)
-
-        print(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
-        exit(1)
+        sys.exit(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
 
 
-def handle_recent_command(args, print_help_func):
+def handle_recent_command(args, failure_exit_func):
     check_prompt(args.debug)  # Fail the command if PROMPT_COMMAND is not set
     conn = create_connection()
     # Install REGEXP sqlite UDF.
@@ -521,7 +528,7 @@ def handle_recent_command(args, print_help_func):
     detail_results = []
     columns_to_print = args.columns.split(',')
     columns_to_print.extend(['command_dt', 'command'])
-    for query, parameters in query_builder(args, print_help_func):
+    for query, parameters in query_builder(args, failure_exit_func):
         for row in c.execute(query, parameters):
             row_dict = {
                 DB.TAIL_N_ROWS_COLUMNS[i]: row[i]
@@ -563,7 +570,7 @@ def handle_recent_command(args, print_help_func):
 def main():
     parser = make_arg_parser_for_recent()
     args = parser.parse_args()
-    handle_recent_command(args, parser.print_help)
+    handle_recent_command(args, parser.exit)
 
 
 if __name__ == '__main__':

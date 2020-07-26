@@ -5,13 +5,16 @@ install:
   - pip install tabulate # dependency.
   - pip install codecov # code coverage.
   - pip install flake8
+before_script:
+  flake8 .
 script:
   # testing + coverage.
   - coverage run recent2_test.py
   # Basic e2e tests.
   - bash scripts/install_test.sh
-before_script:
-  flake8 .
+# Push coverage results codecov
+after_success:
+  - codecov
 deploy:
   provider: pypi
   user: __token__
@@ -24,6 +27,3 @@ deploy:
       && $TRAVIS_TAG == $TRAVIS_BRANCH"
     repo: dotslash/recent2
     all_branches: true
-# Push coverage results codecov
-after_success:
-  - codecov
