@@ -135,9 +135,12 @@ class RecentTest(TestBase):
         self.logCmd("status2 1", return_value=2)
         self.logCmd("status2 2", return_value=2)
 
+        def red(x):
+            return recent2.Term.FAIL + x + recent2.Term.ENDC
+
         success_cmds = ["status0 1", "status0 2"]
-        status1_cmds = ["status1 1", "status1 2"]
-        status2_cmds = ["status2 1", "status2 2"]
+        status1_cmds = [red("status1 1"), red("status1 2")]
+        status2_cmds = [red("status2 1"), red("status2 2")]
 
         # Default => all commands.
         self.check_without_ts(self.query(""), success_cmds + status1_cmds + status2_cmds)
