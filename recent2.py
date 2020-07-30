@@ -529,7 +529,7 @@ def handle_recent_command(args, failure_exit_func):
     c = conn.cursor()
     detail_results = []
     columns_to_print = args.columns.split(',')
-    columns_to_print.extend(['command_dt', 'command'])
+    columns_to_print.extend(['command_dt', 'command', 'return_val'])
     for query, parameters in query_builder(args, failure_exit_func):
         for row in c.execute(query, parameters):
             row_dict = {
@@ -543,10 +543,16 @@ def handle_recent_command(args, failure_exit_func):
             if args.detail:
                 detail_results.append(row_dict)
                 continue
+            colored_cmd = row_dict['command']
+            if row_dict['return_val'] > 0:
+                # Show failed commands in red.
+                # We do > 0 because for commands we got via import_bash_history, the return_val
+                # is negative
+                colored_cmd = Term.FAIL + colored_cmd + Term.ENDC
             if args.hide_time:
-                print(row_dict['command'])
+                print(colored_cmd)
             if not args.hide_time:
-                print(Term.WARNING + row_dict['command_dt'] + Term.ENDC + ' ' + row_dict['command'])
+                print(Term.WARNING + row_dict['command_dt'] + Term.ENDC + ' ' + colored_cmd)
     if args.detail:
         if 'json_data' not in columns_to_print:
             print(tabulate(detail_results, headers="keys"))
