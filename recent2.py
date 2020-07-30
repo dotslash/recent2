@@ -542,7 +542,10 @@ def handle_recent_command(args, failure_exit_func):
                 detail_results.append(row_dict)
                 continue
             colored_cmd = row_dict['command']
-            if row_dict['return_val'] != 0:
+            if row_dict['return_val'] > 0:
+                # Show failed commands in red.
+                # We do > 0 because for commands we got via import_bash_history, the return_val
+                # is negative
                 colored_cmd = Term.FAIL + colored_cmd + Term.ENDC
             if args.hide_time:
                 print(colored_cmd)
