@@ -119,9 +119,10 @@ class DB:
 
 
 class Session:
-    def __init__(self, pid, sequence):
-        self.sequence = sequence
-        self.empty = False
+    @classmethod
+    def session_id_string(cls, pid=None):
+        # TODO(sai): Should this always be ppid?
+        pid = pid or os.getppid()
         # This combination of ENV vars *should* provide a unique session
         # TERM_SESSION_ID for OS X Terminal
         # XTERM for xterm
@@ -137,7 +138,12 @@ class Session:
             os.getenv('STY', ''),
             pid,
         )  # yapf: disable
-        self.id = hashlib.md5(seed.encode('utf-8')).hexdigest()
+        return hashlib.md5(seed.encode('utf-8')).hexdigest()
+
+    def __init__(self, pid, sequence):
+        self.sequence = sequence
+        self.empty = False
+        self.id = Session.session_id_string(pid)
 
     def update(self, conn):
         c = conn.cursor()
@@ -372,6 +378,9 @@ def query_builder(args, failure_exit_func):
     query = DB.TAIL_N_ROWS_TEMPLATE
     filters = []
     parameters = []
+    if args.cur_session_only:
+        filters.append('session = ?')
+        parameters.append(Session.session_id_string())
     if args.successes_only:
         filters.append('return_val = 0')
     if args.failures_only:
@@ -454,6 +463,10 @@ def make_arg_parser_for_recent():
                         action='store_true')
     # Other filters/options.
     parser.add_argument('-w', metavar='/folder', help='working directory', default='')
+    parser.add_argument('--cur_session_only',
+                        '-cs',
+                        help='Returns commands only from current session',
+                        action='store_true')
     parser.add_argument('-d',
                         metavar='2016-10-01',
                         help='date in YYYY-MM-DD, YYYY-MM, or YYYY format',
@@ -465,9 +478,9 @@ def make_arg_parser_for_recent():
                         '-cl',
                         metavar='200',
                         help='Ignore commands longer than this.',
-                        default=200)
-    parser.add_argument('-e',
-                        '--env',
+                        default=400)
+    parser.add_argument('--env',
+                        '-e',
                         action='append',
                         help=('Filter by shell env vars. Env vars set in RECENT_ENV_VARS '
                               'as comma separated list will be captured.'),
