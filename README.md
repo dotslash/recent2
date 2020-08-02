@@ -51,9 +51,10 @@ See example usage at https://asciinema.org/a/271533
 ```sh
 > recent -h
 usage: recent [-h] [-n 20] [--status_num 0] [--successes_only]
-              [--failures_only] [-w /folder] [-d 2016-10-01] [--return_self]
-              [--char_limit 200] [-e key[:val]] [--hide_time] [--debug]
-              [--detail] [--columns COLUMNS] [-re] [-sql] [--nocase]
+              [--failures_only] [-w /folder] [--cur_session_only]
+              [-d 2016-10-01] [--return_self] [--char_limit 200]
+              [--env key[:val]] [--hide_time] [--debug] [--detail]
+              [--columns COLUMNS] [-re] [-sql] [--nocase]
               [pattern]
 
 recent is a convenient way to query bash history. Visit
@@ -73,11 +74,13 @@ optional arguments:
                         only return commands that exited with success
   --failures_only, -fo  only return commands that exited with failure
   -w /folder            working directory
+  --cur_session_only, -cs
+                        Returns commands only from current session
   -d 2016-10-01         date in YYYY-MM-DD, YYYY-MM, or YYYY format
   --return_self         Return `recent` commands also in the output
   --char_limit 200, -cl 200
                         Ignore commands longer than this.
-  -e key[:val], --env key[:val]
+  --env key[:val], -e key[:val]
                         Filter by shell env vars. Env vars set in
                         RECENT_ENV_VARS as comma separated list will be
                         captured.
