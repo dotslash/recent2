@@ -40,7 +40,10 @@ class TestBase(unittest.TestCase):
 
         # Initialize the session
         self._keep_alive_conn = recent2.create_connection()
-        session = recent2.Session(self._shell_pid, self._sequence)
+        self.initSession(self._shell_pid)
+
+    def initSession(self, pid):
+        session = recent2.Session(pid, 0)
         session.update(self._keep_alive_conn)
         # Do not close the connection. Keep it alive to make sure the in mem db is not cleaned up
         self._keep_alive_conn.commit()
@@ -78,12 +81,12 @@ class RecentTest(TestBase):
         }
         assert tests_option.untested_options == untested_options
 
-    def logCmd(self, cmd, return_value=0, pwd="/root", time=None):
+    def logCmd(self, cmd, return_value=0, pwd="/root", time=None, shell_pid=None):
         self._sequence += 1
         self._time_secs += 1
         with mock.patch('time.time', return_value=time or self._time_secs):
             recent2.log_command(command=cmd,
-                                pid=self._shell_pid,
+                                pid=shell_pid or self._shell_pid,
                                 sequence=self._sequence,
                                 return_value=return_value,
                                 pwd=pwd)
@@ -156,16 +159,32 @@ class RecentTest(TestBase):
 
     @tests_option("char_limit")
     def test_char_limit(self):
-        self.logCmd("c" * 190)  # 190 chars
-        self.logCmd("c" * 200)  # 200 chars
-        self.logCmd("c" * 210)  # 210 chars
-        # default is 200 char limit
-        self.check_without_ts(self.query(""), ["c" * 190, "c" * 200])
+        self.logCmd("c" * 390)  # 390 chars
+        self.logCmd("c" * 400)  # 400 chars
+        self.logCmd("c" * 410)  # 410 chars
+        # default is 400 char limit
+        self.check_without_ts(self.query(""), ["c" * 390, "c" * 400])
         # Check with explicit limits
-        self.check_without_ts(self.query("-cl 190"), ["c" * 190])
-        self.check_without_ts(self.query("--char_limit 190"), ["c" * 190])
-        self.check_without_ts(self.query("--char_limit 200"), ["c" * 190, "c" * 200])
-        self.check_without_ts(self.query("--char_limit 210"), ["c" * 190, "c" * 200, "c" * 210])
+        self.check_without_ts(self.query("-cl 390"), ["c" * 390])
+        self.check_without_ts(self.query("--char_limit 390"), ["c" * 390])
+        self.check_without_ts(self.query("--char_limit 400"), ["c" * 390, "c" * 400])
+        self.check_without_ts(self.query("--char_limit 410"), ["c" * 390, "c" * 400, "c" * 410])
+
+    @tests_option("cur_session_only")
+    def test_cur_session(self):
+        self.initSession(1)
+        self.initSession(2)
+        self.logCmd("shell1 1", shell_pid=1)
+        self.logCmd("shell1 2", shell_pid=1)
+        self.logCmd("shell2 1", shell_pid=2)
+        self.logCmd("shell2 2", shell_pid=2)
+        with mock.patch('os.getppid', return_value=1):
+            self.check_without_ts(self.query("-cs 1"), ["shell1 1", "shell1 2"])
+            self.check_without_ts(self.query("--cur_session_only 1"), ["shell1 1", "shell1 2"])
+
+        with mock.patch('os.getppid', return_value=2):
+            self.check_without_ts(self.query("-cs 2"), ["shell2 1", "shell2 2"])
+            self.check_without_ts(self.query("--cur_session_only 2"), ["shell2 1", "shell2 2"])
 
     @tests_option("nocase")
     @tests_option("pattern")
