@@ -30,11 +30,9 @@ maintain this as I see more interesting use cases.
 
 ## Installation instructions
 
-You need will need sqlite installed.
+Install the recent2 pip package via pip (python 3)
 
-Install the recent pip package.
-
-`pip install recent2`
+`pip3 install recent2`
 
 Add the following to your `.bashrc` or `.bash_profile`.
 
