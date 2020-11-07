@@ -20,6 +20,9 @@ class Term:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
+    LIGHTCYAN = '\033[1;36m'
+    LIGHTGRAY = '\033[0;37m'
+    YELLOW = '\033[0;33m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
@@ -189,7 +192,14 @@ def migrate(cur_version, conn):
 def parse_history(history):
     match = re.search(r'^\s*(\d+)\s+(.*)$', history, re.MULTILINE and re.DOTALL)
     if match:
-        return int(match.group(1)), match.group(2)
+        sequence, cmd = int(match.group(1)), match.group(2)
+        # log command discards if the command being logged has a suffix like "my_cmd <ts>"
+        # If a user copy-pastes recent output, having this timestamp will look weird.
+        copied_from_recent = \
+            re.search(r'^(.*)\s+# rtime@ \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', cmd)
+        if copied_from_recent:
+            cmd = copied_from_recent.group(1)
+        return sequence, cmd
     else:
         return None, None
 
@@ -493,6 +503,7 @@ def make_arg_parser_for_recent():
                         '-ht',
                         help='dont display time in command output',
                         action='store_true')
+    parser.add_argument('--time_first', '-tf', help='Print time first', action='store_true')
     parser.add_argument('--debug', help='Debug mode', action='store_true')
     parser.add_argument('--detail', help='Return detailed output', action='store_true')
     parser.add_argument(
@@ -522,6 +533,18 @@ def check_prompt(debug):
         print(Term.BOLD + "PROMPT_COMMAND env variable is not set. " +
               "Add the following line to .bashrc or .bash_profile" + Term.ENDC)
         sys.exit(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
+
+
+def tty_width():
+    import shutil
+    sz = shutil.get_terminal_size(fallback=(0, 0))
+    return sz.columns
+
+
+def pad(raw_text, print_text):
+    allowed_width = min(tty_width() - 30, 50)
+    to_pad = max(allowed_width - len(raw_text), 0)
+    return print_text + (' ' * to_pad)
 
 
 def handle_recent_command(args, failure_exit_func):
@@ -565,7 +588,12 @@ def handle_recent_command(args, failure_exit_func):
             if args.hide_time:
                 print(colored_cmd)
             if not args.hide_time:
-                print(Term.WARNING + row_dict['command_dt'] + Term.ENDC + ' ' + colored_cmd)
+                cmd_time = row_dict["command_dt"]
+                if args.time_first:
+                    print(f'{Term.YELLOW}{cmd_time}{Term.ENDC} {colored_cmd}')
+                else:
+                    padded_cmd = pad(raw_text=row_dict['command'], print_text=colored_cmd)
+                    print(f'{padded_cmd} # rtime@ {Term.YELLOW}{cmd_time}{Term.ENDC}')
     if args.detail:
         if 'json_data' not in columns_to_print:
             print(tabulate(detail_results, headers="keys"))

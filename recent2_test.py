@@ -64,9 +64,10 @@ class TestBase(unittest.TestCase):
             return out.split("\n")
 
     def check_without_ts(self, result_lines, expected_lines):
-        time_template = recent2.Term.WARNING + "2020-07-20 21:52:33 " + recent2.Term.ENDC
-        # Strip the time prefix on the results before comparing.
-        result_lines = [r[len(time_template):] for r in result_lines]
+        yellow, endc = recent2.Term.YELLOW, recent2.Term.ENDC
+        time_template = f" # rtime@ {yellow}2020-07-20 21:52:33{endc}"
+        # Strip the time suffix on the results before comparing.
+        result_lines = [r[:-len(time_template)] for r in result_lines]
         self.assertEqual(expected_lines, result_lines)
 
 
@@ -77,7 +78,7 @@ class RecentTest(TestBase):
             'help',  # Need not test help
             # TODO: These options change how we display the results. Figure out how to test them.
             'columns',
-            'detail'
+            'detail',
         }
         assert tests_option.untested_options == untested_options
 
@@ -110,6 +111,17 @@ class RecentTest(TestBase):
         # Time will not be printed, we can check the raw lines directly
         self.assertEqual(["cmd1", "cmd2"], self.query("--hide_time"))
         self.assertEqual(["cmd1", "cmd2"], self.query("-ht"))
+
+    @tests_option("time_first")
+    def test_time_first(self):
+        def strip_time(result_lines):
+            time_template = recent2.Term.YELLOW + "2020-07-20 21:52:33 " + recent2.Term.ENDC
+            return [r[len(time_template):] for r in result_lines]
+
+        self.logCmd("cmd1")
+        self.logCmd("cmd2")
+        self.assertEqual(["cmd1", "cmd2"], strip_time(self.query("--time_first")))
+        self.assertEqual(["cmd1", "cmd2"], strip_time(self.query("-tf")))
 
     def test_tail_duplicate(self):
         # Runs test tail again. This will make sure that we are creating & cleaning up properly
@@ -380,11 +392,20 @@ class LogCommandTest(TestBase):
         os.environ['PWD'] = '/cur_pwd'
         with mock.patch('recent2.log_command') as log_command:
             recent2.log(["-r", "12", "-c", "123 my_cmd", "-p", "1234"])
-            log_command.assert_called_with(command="my_cmd",
-                                           pid=1234,
-                                           sequence=123,
-                                           return_value=12,
-                                           pwd="/cur_pwd")
+            log_command.assert_called_with(command="my_cmd", pid=1234, sequence=123,
+                                           return_value=12, pwd="/cur_pwd")
+
+            ts = "# rtime@ 2020-07-20 21:52:33"
+            # log command discards if the command being logged has a suffix like "my_cmd <ts>"
+            # If a user copy-pastes recent output, having this timestamp will look weird.
+            recent2.log(["-r", "12", "-c", f"123 cmd1 {ts}", "-p", "1234"])
+            log_command.assert_called_with(command="cmd1", pid=1234, sequence=123,
+                                           return_value=12, pwd="/cur_pwd")
+
+            # Extra trailing space. timestamp will not be trimmed.
+            recent2.log(["-r", "12", "-c", f"123 cmd_extra_space {ts} ", "-p", "1234"])
+            log_command.assert_called_with(command=f"cmd_extra_space {ts} ", pid=1234, sequence=123,
+                                           return_value=12, pwd="/cur_pwd")
 
     def test_parse_history(self):
         cmd = "cmd arg1 arg2 arg3"
@@ -441,7 +462,6 @@ class ImportBashHistory(TestBase):
         # - we are checking for cmd3 before cmd2 because cmd3 will get cmd2's timestamp and
         #   sqlite returns latest inserted item first.
         self.check_without_ts(self.query(""), ["cmd1", "cmd3", "cmd2", "cmd4"])
-        #
         self.assertTrue(Path(self.import_marker).exists())
 
     def test_import(self):
