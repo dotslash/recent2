@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 import io
 import os
 import time
@@ -22,6 +23,13 @@ class tests_option:
             f(*args)
 
         return wrapped_f
+
+
+def currenttz():
+    if time.daylight:
+        return timezone(timedelta(seconds=-time.altzone), time.tzname[1])
+    else:
+        return timezone(timedelta(seconds=-time.timezone), time.tzname[0])
 
 
 class TestBase(unittest.TestCase):
@@ -70,6 +78,21 @@ class TestBase(unittest.TestCase):
         result_lines = [r[:-len(time_template)] for r in result_lines]
         self.assertEqual(expected_lines, result_lines)
 
+    def check_with_ts(self, result_lines, expected_lines):
+        yellow, endc = recent2.Term.YELLOW, recent2.Term.ENDC
+
+        # Strip the time suffix on the results before comparing.
+        def fmt_time(x):
+            # Im not sure why timezone is being picked by recent as utc here.
+            # But the cli normally returns localtime
+            return datetime.fromtimestamp(x, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+
+        expected_lines = [
+            f"{cmd} # rtime@ {yellow}{fmt_time(cmd_time_secs)}{endc}"
+            for cmd, cmd_time_secs in expected_lines
+        ]
+        self.assertEqual(expected_lines, result_lines)
+
 
 class RecentTest(TestBase):
     @classmethod
@@ -82,10 +105,10 @@ class RecentTest(TestBase):
         }
         assert tests_option.untested_options == untested_options
 
-    def logCmd(self, cmd, return_value=0, pwd="/root", time=None, shell_pid=None):
+    def logCmd(self, cmd, return_value=0, pwd="/root", time_secs=None, shell_pid=None):
         self._sequence += 1
         self._time_secs += 1
-        with mock.patch('time.time', return_value=time or self._time_secs):
+        with mock.patch('time.time', return_value=time_secs or self._time_secs):
             recent2.log_command(command=cmd,
                                 pid=shell_pid or self._shell_pid,
                                 sequence=self._sequence,
@@ -284,10 +307,10 @@ class RecentTest(TestBase):
             # 12 pm on the given day
             return datetime.datetime(yr, m, day, hour=12).timestamp()
 
-        self.logCmd("cmd 2019-07-01", time=ts_for_date("2019-07-01"))
-        self.logCmd("cmd 2020-06-01", time=ts_for_date("2020-06-01"))
-        self.logCmd("cmd 2020-07-01", time=ts_for_date("2020-07-01"))
-        self.logCmd("cmd 2020-07-02", time=ts_for_date("2020-07-02"))
+        self.logCmd("cmd 2019-07-01", time_secs=ts_for_date("2019-07-01"))
+        self.logCmd("cmd 2020-06-01", time_secs=ts_for_date("2020-06-01"))
+        self.logCmd("cmd 2020-07-01", time_secs=ts_for_date("2020-07-01"))
+        self.logCmd("cmd 2020-07-02", time_secs=ts_for_date("2020-07-02"))
 
         self.check_without_ts(self.query("-d 2020"),
                               ["cmd 2020-06-01", "cmd 2020-07-01", "cmd 2020-07-02"])
@@ -383,6 +406,23 @@ class RecentTest(TestBase):
             # First argument in first call to exit_mock
             exit_arg = exit_mock.call_args[0][0]
             self.assertTrue('PROMPT_COMMAND' in exit_arg and recent2.EXPECTED_PROMPT in exit_arg)
+
+    @tests_option("dedup")
+    def test_dedup(self):
+        base_pid = self._shell_pid
+        for i in range(1, 5):
+            self.initSession(base_pid + i)
+
+        self.logCmd("cmd 1", pwd="/dir1", shell_pid=base_pid + 1, time_secs=1, return_value=0)
+        self.logCmd("cmd 2", pwd="/dir1", shell_pid=base_pid + 2, time_secs=2, return_value=0)
+        # Log same commands as above. But use different shells. Ensure that
+        # the code handles same comment, but different dir properly.
+        self.logCmd("cmd 1", pwd="/dir2", shell_pid=base_pid + 3, time_secs=3, return_value=1)
+        self.logCmd("cmd 2", pwd="/dir2", shell_pid=base_pid + 4, time_secs=4, return_value=1)
+
+        self.check_with_ts(self.query("cmd --dedup"), [("cmd 1", 3), ("cmd 2", 4)])
+        self.check_with_ts(self.query("cmd --dedup -so"), [("cmd 1", 1), ("cmd 2", 2)])
+        self.check_with_ts(self.query("cmd --dedup -fo"), [("cmd 1", 3), ("cmd 2", 4)])
 
 
 class LogCommandTest(TestBase):
