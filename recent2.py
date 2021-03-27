@@ -79,12 +79,23 @@ class DB:
         where session = ?"""
     # TAIL_N_ROWS's columns (column order is same as TAIL_N_ROWS
     TAIL_N_ROWS_COLUMNS = 'command_dt,command,pid,return_val,pwd,session,json_data'.split(',')
+    TAIL_N_ROWS_DEDUP_COLUMNS = 'command_dt,command'.split(',')
     TAIL_N_ROWS_TEMPLATE = """
         select command_dt,command,pid,return_val,pwd,session,json_data
         from (
             select *
             from commands
             where
+            order by command_dt desc limit ?
+        )
+        order by command_dt"""
+    TAIL_N_ROWS_TEMPLATE_DEDUP = """
+        select *
+        from (
+            select max(command_dt) as command_dt, command
+            from commands
+            where
+            group by command
             order by command_dt desc limit ?
         )
         order by command_dt"""
@@ -212,7 +223,8 @@ def parse_date(date_format):
     if re.match(r'^\d{4}-\d{2}-\d{2}$', date_format):
         return 'date(command_dt) = ?'
     else:
-        return 'command_dt = ?'
+        print("Invalid date passed to -d")
+        sys.exit(1)
 
 
 def create_connection():
@@ -385,7 +397,7 @@ def query_builder(args, failure_exit_func):
         print(Term.FAIL + ('Only one of --successes_only, --failures_only and '
                            '--status_num has to be set') + Term.ENDC)
         failure_exit_func(1)
-    query = DB.TAIL_N_ROWS_TEMPLATE
+    query = DB.TAIL_N_ROWS_TEMPLATE_DEDUP if args.dedup else DB.TAIL_N_ROWS_TEMPLATE
     filters = []
     parameters = []
     if args.cur_session_only:
@@ -496,6 +508,7 @@ def make_arg_parser_for_recent():
                               'as comma separated list will be captured.'),
                         metavar='key[:val]',
                         default=[])
+    parser.add_argument('--dedup', action='store_true', help=('ok'))
 
     # CONTROL OUTPUT FORMAT
     # Hide time. This makes copy-pasting simpler.
@@ -564,14 +577,15 @@ def handle_recent_command(args, failure_exit_func):
     conn.set_trace_callback(update_queries_executed)
     c = conn.cursor()
     detail_results = []
-    columns_to_print = args.columns.split(',')
-    columns_to_print.extend(['command_dt', 'command', 'return_val'])
+    columns_to_print = set(args.columns.split(','))
+    columns_to_print.update(['command_dt', 'command', 'return_val'])
     for query, parameters in query_builder(args, failure_exit_func):
         for row in c.execute(query, parameters):
+            query_columns = DB.TAIL_N_ROWS_DEDUP_COLUMNS if args.dedup else DB.TAIL_N_ROWS_COLUMNS
             row_dict = {
-                DB.TAIL_N_ROWS_COLUMNS[i]: row[i]
+                query_columns[i]: row[i]
                 for i in range(len(row))
-                if DB.TAIL_N_ROWS_COLUMNS[i] in columns_to_print
+                if query_columns[i] in columns_to_print
             }
             if 'command_dt' not in row_dict or 'command' not in row_dict:
                 # Why would we have these entries?
@@ -580,7 +594,7 @@ def handle_recent_command(args, failure_exit_func):
                 detail_results.append(row_dict)
                 continue
             colored_cmd = row_dict['command']
-            if row_dict['return_val'] > 0:
+            if row_dict.get('return_val', 0) > 0:
                 # Show failed commands in red.
                 # We do > 0 because for commands we got via import_bash_history, the return_val
                 # is negative
