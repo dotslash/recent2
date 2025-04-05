@@ -19,10 +19,10 @@ Recent does the following.
 
 ## NOTE about [trengrj/recent](https://github.com/trengrj/recent)
 
-`recent2` started off as a clone of [trengrj/recent](https://github.com/trengrj/recent).
+`recent2` started off as a fork of [trengrj/recent](https://github.com/trengrj/recent).
 I used [trengrj](https://github.com/trengrj)'s util for about a month and I really
-liked it. However I saw some short comings in the tool. I made a clone because trengrj
-has not been very responsive.
+liked it. However I saw some short comings in the tool. I made a clone because the original
+project seems to be unmaintained.
 
 Most of the core logic is written by [trengrj](https://github.com/trengrj). I added
 a lot of incremental patches for the things that interested me. I intend to actively
