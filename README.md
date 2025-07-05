@@ -40,6 +40,66 @@ Add the following to your `.bashrc` or `.bash_profile`.
 
 And start a new shell.
 
+### For Zsh Users
+
+Recent2 can also be integrated with Zsh. You'll need to add a couple of functions to your `.zshrc` to use Zsh's `precmd` and `preexec` hooks.
+
+1.  **Ensure `log-recent` is in your PATH.** This is typically handled by pip installation.
+2.  **Add the following to your `~/.zshrc`:**
+
+```zsh
+# recent2 Zsh Integration
+autoload -U add-zsh-hook
+
+_recent2_preexec() {
+  if [[ -n "$3" ]]; then
+    _RECENT2_CURRENT_COMMAND_TEXT="$3"
+    _RECENT2_CURRENT_COMMAND_SEQ="$HISTCMD"
+  else
+    unset _RECENT2_CURRENT_COMMAND_TEXT
+    unset _RECENT2_CURRENT_COMMAND_SEQ
+  fi
+}
+
+_recent2_precmd() {
+  if [[ -n "$_RECENT2_CURRENT_COMMAND_TEXT" && -n "$_RECENT2_CURRENT_COMMAND_SEQ" ]]; then
+    local return_status=$?
+    if command -v log-recent &>/dev/null; then
+      log-recent --shell zsh \
+                 -r "$return_status" \
+                 -p "$$" \
+                 --raw_command_text "$_RECENT2_CURRENT_COMMAND_TEXT" \
+                 --sequence_num "$_RECENT2_CURRENT_COMMAND_SEQ"
+    else
+      if [[ -z "$_RECENT2_LOG_RECENT_WARNING_SHOWN" ]]; then
+        echo "recent2: log-recent command not found. Please ensure it's in your PATH." >&2
+        _RECENT2_LOG_RECENT_WARNING_SHOWN=1
+      fi
+    fi
+    unset _RECENT2_CURRENT_COMMAND_TEXT
+    unset _RECENT2_CURRENT_COMMAND_SEQ
+  fi
+}
+
+if [[ -z "${precmd_functions[(r)_recent2_precmd]}" ]]; then
+  add-zsh-hook precmd _recent2_precmd
+fi
+
+if [[ -z "${preexec_functions[(r)_recent2_preexec]}" ]]; then
+  add-zsh-hook preexec _recent2_preexec
+fi
+# End of recent2 Zsh Integration
+```
+
+3.  **Start a new Zsh shell.**
+
+This setup uses:
+*   `_recent2_preexec`: Captures the command text (from `$3`) and its history number (`HISTCMD`) before execution.
+*   `_recent2_precmd`: Calls `log-recent` with the captured details and exit status (`$?`) after the command finishes but before the prompt is displayed.
+*   `add-zsh-hook`: Safely adds these functions to Zsh's hook arrays.
+
+Alternatively, you can find this snippet in the `recent2_zsh_setup.sh` file in the repository and source it if you prefer.
+
 ## Usage
 
 See example usage at https://asciinema.org/a/271533
