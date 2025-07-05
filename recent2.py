@@ -28,9 +28,7 @@ class Term:
 
 
 EXPECTED_BASH_PROMPT_COMMAND = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
-# For zsh, we'll expect users to set up precmd and preexec functions.
-# We can't easily check the exact content of these functions from here,
-# so we'll rely on RECENT_SHELL_INTEGRATION_CHECK_OFF to disable the check if needed.
+
 
 class DB:
     SCHEMA_VERSION = 2
@@ -271,52 +269,19 @@ def log(args_for_test=None):
                         help='Command return value. Set to $?',
                         default=0,
                         type=int)
-    parser.add_argument('-c', '--command', help='For bash: Set to $(HISTTIMEFORMAT= history 1). For zsh: Set to the captured command string.', default='')
+    parser.add_argument('-c', '--command', help='Set to $(HISTTIMEFORMAT= history 1)', default='')
     parser.add_argument('-p', '--pid', help='Shell pid. Set to $$', default=0, type=int)
-    parser.add_argument('--shell', help='Calling shell type (e.g., bash, zsh)', default='bash') # Add shell type
-    parser.add_argument('--sequence_num', help='History sequence number (primarily for zsh if passed directly)', type=int, default=None)
-    parser.add_argument('--raw_command_text', help='Direct command text (primarily for zsh)', type=str, default=None)
-
     args = parser.parse_args(args_for_test)
 
+    sequence, command = parse_history(args.command)
     pid, return_value = args.pid, args.return_value
     pwd = os.getenv('PWD', '')
-    command_to_log = None
-    sequence_to_log = None
 
-    if args.shell == 'zsh':
-        if args.raw_command_text is not None and args.sequence_num is not None:
-            command_to_log = args.raw_command_text
-            sequence_to_log = args.sequence_num
-        else:
-            # Zsh should provide raw_command_text and sequence_num
-            print(Term.WARNING + ('recent: zsh integration expects --raw_command_text and --sequence_num.') + Term.ENDC)
-            # Potentially fall back to parsing args.command if zsh history -1 format is compatible and passed via -c
-            # For now, we'll be strict.
-            if not args.raw_command_text:
-                 print(Term.FAIL + ('recent: --raw_command_text is missing for zsh.') + Term.ENDC)
-                 sys.exit(1)
-            if args.sequence_num is None:
-                 print(Term.FAIL + ('recent: --sequence_num is missing for zsh.') + Term.ENDC)
-                 sys.exit(1)
-            return # Should not happen if zsh functions are set up correctly
-
-    elif args.shell == 'bash':
-        sequence_to_log, command_to_log = parse_history(args.command)
-        if not sequence_to_log or not command_to_log:
-            print(Term.WARNING + ('recent: cannot parse bash command output, please check your '
-                                  'trigger looks like this:') + Term.ENDC)
-            exit("""export PROMPT_COMMAND='{}'""".format(EXPECTED_BASH_PROMPT_COMMAND))
-    else:
-        print(Term.FAIL + ('recent: unsupported shell type "{}".'.format(args.shell)) + Term.ENDC)
-        sys.exit(1)
-
-    if command_to_log is None or sequence_to_log is None:
-        # This case should ideally be caught by shell-specific checks above
-        print(Term.FAIL + "recent: Failed to determine command or sequence number." + Term.ENDC)
-        sys.exit(1)
-
-    log_command(command=command_to_log, pid=pid, sequence=sequence_to_log, return_value=return_value, pwd=pwd)
+    if not sequence or not command:
+        print(Term.WARNING + ('recent: cannot parse command output, please check your bash '
+                              'trigger looks like this:') + Term.ENDC)
+        exit("""export PROMPT_COMMAND='{}'""".format(EXPECTED_PROMPT))
+    log_command(command=command, pid=pid, sequence=sequence, return_value=return_value, pwd=pwd)
 
 
 def log_command(command, pid, sequence, return_value, pwd):
@@ -571,37 +536,28 @@ def make_arg_parser_for_recent():
 
 
 def check_prompt(debug):
-    # RECENT_SHELL_INTEGRATION_CHECK_OFF allows users to bypass this check if they have a custom setup.
     if os.environ.get('RECENT_SHELL_INTEGRATION_CHECK_OFF'):
         if debug:
-            print("RECENT_SHELL_INTEGRATION_CHECK_OFF is set. Not checking shell integration.")
+            print("recent2: RECENT_SHELL_INTEGRATION_CHECK_OFF is set. Skipping prompt check.")
         return
 
-    if os.environ.get('RECENT_CUSTOM_PROMPT'): # Legacy support for bash custom prompt
+    if os.environ.get('RECENT_CUSTOM_PROMPT'):  # Legacy support for bash custom prompt
         if debug:
-            print("RECENT_CUSTOM_PROMPT is set (legacy). Not checking prompt for bash.")
+            print("recent2: RECENT_CUSTOM_PROMPT is set (legacy). Skipping PROMPT_COMMAND check for bash.")
         return
 
     current_shell = os.path.basename(os.environ.get('SHELL', ''))
 
     if 'bash' in current_shell:
         actual_prompt = os.environ.get('PROMPT_COMMAND', '')
-        export_prompt_cmd = '''export PROMPT_COMMAND='{}' '''.format(EXPECTED_BASH_PROMPT_COMMAND)
+        # Ensure EXPECTED_BASH_PROMPT_COMMAND is defined, using the one from global scope
         if EXPECTED_BASH_PROMPT_COMMAND not in actual_prompt:
-            print(Term.BOLD + "Bash PROMPT_COMMAND env variable is not correctly set for recent2. " +
-                  "Add the following line to .bashrc or .bash_profile" + Term.ENDC)
+            export_prompt_cmd = '''export PROMPT_COMMAND='{}' '''.format(EXPECTED_BASH_PROMPT_COMMAND)
+            print(Term.BOLD + "recent2: Bash PROMPT_COMMAND env variable is not correctly set. " +
+                  "Add the following line to .bashrc or .bash_profile:" + Term.ENDC)
             sys.exit(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
-    elif 'zsh' in current_shell:
-        # For Zsh, it's harder to check the precmd/preexec functions directly from Python.
-        # We'll rely on the user setting them up as per documentation.
-        # A simple check could be to see if _RECENT2_LAST_COMMAND is available if we decide to set it globally,
-        # but that's not robust.
-        # For now, we'll just print a reminder if debug is on.
-        if debug:
-            print(Term.OKBLUE + "recent2: Ensure zsh precmd and preexec functions for recent2 are correctly set up in your .zshrc." + Term.ENDC)
-    # else:
-        # Potentially handle other shells or print a generic message.
-        # For now, we only explicitly support bash and zsh for this check.
+    # For other shells like zsh, this function will do nothing,
+    # as their integration is handled differently (e.g., via .zshrc hooks).
 
 
 def tty_width():
