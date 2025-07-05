@@ -27,7 +27,7 @@ class Term:
     UNDERLINE = '\033[4m'
 
 
-EXPECTED_PROMPT = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
+EXPECTED_BASH_PROMPT_COMMAND = 'log-recent -r $? -c "$(HISTTIMEFORMAT= history 1)" -p $$'
 
 
 class DB:
@@ -536,16 +536,28 @@ def make_arg_parser_for_recent():
 
 
 def check_prompt(debug):
-    if os.environ.get('RECENT_CUSTOM_PROMPT'):
+    if os.environ.get('RECENT_SHELL_INTEGRATION_CHECK_OFF'):
         if debug:
-            print("RECENT_CUSTOM_PROMPT is set. Not checking prompt")
+            print("recent2: RECENT_SHELL_INTEGRATION_CHECK_OFF is set. Skipping prompt check.")
         return
-    actual_prompt = os.environ.get('PROMPT_COMMAND', '')
-    export_prompt_cmd = '''export PROMPT_COMMAND='{}' '''.format(EXPECTED_PROMPT)
-    if EXPECTED_PROMPT not in actual_prompt:
-        print(Term.BOLD + "PROMPT_COMMAND env variable is not set. " +
-              "Add the following line to .bashrc or .bash_profile" + Term.ENDC)
-        sys.exit(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
+
+    if os.environ.get('RECENT_CUSTOM_PROMPT'):  # Legacy support for bash custom prompt
+        if debug:
+            print("recent2: RECENT_CUSTOM_PROMPT is set (legacy). Skipping PROMPT_COMMAND check for bash.")
+        return
+
+    current_shell = os.path.basename(os.environ.get('SHELL', ''))
+
+    if 'bash' in current_shell:
+        actual_prompt = os.environ.get('PROMPT_COMMAND', '')
+        # Ensure EXPECTED_BASH_PROMPT_COMMAND is defined, using the one from global scope
+        if EXPECTED_BASH_PROMPT_COMMAND not in actual_prompt:
+            export_prompt_cmd = '''export PROMPT_COMMAND='{}' '''.format(EXPECTED_BASH_PROMPT_COMMAND)
+            print(Term.BOLD + "recent2: Bash PROMPT_COMMAND env variable is not correctly set. " +
+                  "Add the following line to .bashrc or .bash_profile:" + Term.ENDC)
+            sys.exit(Term.UNDERLINE + export_prompt_cmd + Term.ENDC)
+    # For other shells like zsh, this function will do nothing,
+    # as their integration is handled differently (e.g., via .zshrc hooks).
 
 
 def tty_width():
